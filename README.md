@@ -1,5 +1,5 @@
-# Unity profiler data extractor
-Utility to extract data from the unity profiler.
+# Unity Profiler Data Exporter
+Utility to export data from the unity profiler.
 
 This is a first working version but I plan to add other features shortly.
 Anyone who wants to contribute is very welcome, just make a pull request.
