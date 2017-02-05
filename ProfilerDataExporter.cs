@@ -23,11 +23,13 @@ public class ProfilerDataExporter : EditorWindow
     private Type profilerWindowType;
     private FieldInfo currentFrameFieldInfo;
     private Vector2 scrollPosition;
-    private FunctionData[] worstTotaTimeFunctions;
+    private FunctionData[] worstSelfTimeFunctions;
     private FunctionData[] worstGCAllocFunctions;
     private ByteSize maxGCAlloc;
     private float maxTime;
     private string calculatedPropertyPath;
+    private Vector2 worstSelfTimeScrollPosition;
+    private Vector2 worstGCAllocScrollPosition;
 
     [MenuItem("Window/Profiler Data Exporter")]
     private static void Init()
@@ -99,40 +101,42 @@ public class ProfilerDataExporter : EditorWindow
             var profilerData = GetProfilerData(firstFrameIndex, lastFrameIndex);
             var functionsData = profilerData.frames.SelectMany(f => f.functions);
             var groupedFunctionData = functionsData.GroupBy(f => f.GetValue(ProfilerColumn.FunctionName));
-            worstTotaTimeFunctions =
+            worstSelfTimeFunctions =
                 groupedFunctionData
-                    .Select(g => g.OrderByDescending(f => f.GetValue(ProfilerColumn.TotalTime)).First())
-                    .OrderByDescending(f => f.GetValue(ProfilerColumn.TotalTime))
-                    .Take(5)
+                    .Select(g => g.OrderByDescending(f => float.Parse(f.GetValue(ProfilerColumn.SelfTime))).First())
+                    .OrderByDescending(f => float.Parse(f.GetValue(ProfilerColumn.SelfTime)))
                     .ToArray();
             worstGCAllocFunctions =
                 groupedFunctionData
                     .Select(g => g.OrderByDescending(f => ByteSize.Parse(f.GetValue(ProfilerColumn.GCMemory))).First())
                     .OrderByDescending(f => ByteSize.Parse(f.GetValue(ProfilerColumn.GCMemory)))
-                    .Take(5)
                     .ToArray();
         }
 
-        if (worstTotaTimeFunctions != null)
+        if (worstSelfTimeFunctions != null)
         {
-            GUILayout.Label("Worst Total time functions", EditorStyles.boldLabel);
-            foreach (var f in worstTotaTimeFunctions)
+            GUILayout.Label("Worst Self time functions", EditorStyles.boldLabel);
+            worstSelfTimeScrollPosition = EditorGUILayout.BeginScrollView(worstSelfTimeScrollPosition, GUILayout.MinHeight(100f));
+            foreach (var f in worstSelfTimeFunctions)
             {
                 var name = f.GetValue(ProfilerColumn.FunctionName);
-                var totalTime = f.GetValue(ProfilerColumn.TotalTime);
-                GUILayout.Label(string.Format("{0} = {1}", name, totalTime));
+                var selfTime = f.GetValue(ProfilerColumn.SelfTime);
+                GUILayout.Label(string.Format("{1,-10} {0}", name, selfTime));
             }
+            EditorGUILayout.EndScrollView();
         }
 
         if (worstGCAllocFunctions != null)
         {
             GUILayout.Label("Worst GC Alloc functions", EditorStyles.boldLabel);
+            worstGCAllocScrollPosition = EditorGUILayout.BeginScrollView(worstGCAllocScrollPosition, GUILayout.MinHeight(100f));
             foreach (var f in worstGCAllocFunctions)
             {
                 var name = f.GetValue(ProfilerColumn.FunctionName);
                 var gcAlloc = f.GetValue(ProfilerColumn.GCMemory);
-                GUILayout.Label(string.Format("{0} = {1}", name, gcAlloc));
+                GUILayout.Label(string.Format("{1,-10} {0}", name, gcAlloc));
             }
+            EditorGUILayout.EndScrollView();
         }
 
         var selectedPropertyPath = ProfilerDriver.selectedPropertyPath;
@@ -142,14 +146,14 @@ public class ProfilerDataExporter : EditorWindow
             {
                 var functionData = GetProfilerData(firstFrameIndex, lastFrameIndex, selectedPropertyPath);
                 var functionFrameData = functionData.frames.Where(f => f.functions.Count > 0);
-                maxTime = functionFrameData.Max(f => float.Parse(f.functions[0].GetValue(ProfilerColumn.TotalTime)));
+                maxTime = functionFrameData.Max(f => float.Parse(f.functions[0].GetValue(ProfilerColumn.SelfTime)));
                 maxGCAlloc = functionFrameData.Max(f => ByteSize.Parse(f.functions[0].GetValue(ProfilerColumn.GCMemory)));
                 calculatedPropertyPath = selectedPropertyPath;
             }
 
             GUILayout.Label("Function Statistics", EditorStyles.boldLabel);
             GUILayout.Label(string.Format("Selected function = {0}", selectedPropertyPath));
-            GUILayout.Label(string.Format("Max Total Time = {0}", maxTime));
+            GUILayout.Label(string.Format("Max Self Time = {0}", maxTime));
             GUILayout.Label(string.Format("Max GC Alloc = {0}", maxGCAlloc));
         }
     }
