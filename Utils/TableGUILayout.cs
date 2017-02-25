@@ -42,6 +42,7 @@ namespace ProfilerDataExporter
             var splitter = tableState.SplitterState;
             var rowBackgroundStyle = (rowIndex & 1) == 0 ? evenRowStyle : oddRowStyle;
             Rect rowRect = GUILayoutUtility.GetRect(GUIClip.visibleRect.width, 16f);
+            rowRect.x += 2;
             if (Event.current.type == EventType.Repaint)
             {
                 rowBackgroundStyle.Draw(rowRect, GUIContent.none, false, false, false, false);

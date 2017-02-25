@@ -19,6 +19,12 @@ namespace ProfilerDataExporter
     private const float editorUpdateTime = 1f;
     private float lastUpdateTime = 0;
 #endif
+        private enum StatsType
+        {
+            MaxValues,
+            AverageValues,
+            MinValues
+        }
 
         private static ProfilerColumn[] columnsToShow = new ProfilerColumn[]
         {
@@ -47,13 +53,12 @@ namespace ProfilerDataExporter
         private Type profilerWindowType;
         private FieldInfo currentFrameFieldInfo;
         private Vector2 scrollPosition;
-        private FunctionData[] worstSelfTimeFunctions;
-        private FunctionData[] worstGCAllocFunctions;
+        private FunctionData[] functionStats;
         private ByteSize maxGCAlloc;
         private float maxTime;
         private string calculatedPropertyPath;
-        private FunctionTableState worstGCAllocTableState;
-        private FunctionTableState worstSelfTimeTableState;
+        private FunctionTableState functionStatsTableState;
+        private StatsType statsType;
 
         [MenuItem("Window/Profiler Data Exporter")]
         private static void Init()
@@ -113,6 +118,7 @@ namespace ProfilerDataExporter
 
             GUILayout.BeginHorizontal();
             GUILayout.Label("Statistics", EditorStyles.boldLabel, GUILayout.ExpandWidth(false));
+            statsType = (StatsType)EditorGUILayout.EnumPopup(statsType, GUILayout.ExpandWidth(false));
             var calulateStatistics = GUILayout.Button("Calculate", GUILayout.ExpandWidth(false));
             GUILayout.EndHorizontal();
             if (currentframe > 0)
@@ -124,47 +130,114 @@ namespace ProfilerDataExporter
             {
                 var profilerData = GetProfilerData(firstFrameIndex, lastFrameIndex);
                 var functionsData = profilerData.frames.SelectMany(f => f.functions);
-                var groupedFunctionData = functionsData.GroupBy(f => f.functionPath);
-                worstSelfTimeFunctions =
-                    groupedFunctionData
-                        .Select(g => g.OrderByDescending(f => float.Parse(f.GetValue(ProfilerColumn.SelfTime))).First())
-                        .OrderByDescending(f => float.Parse(f.GetValue(ProfilerColumn.SelfTime)))
-                        .ToArray();
-                worstGCAllocFunctions =
-                    groupedFunctionData
-                        .Select(g => g.OrderByDescending(f => ByteSize.Parse(f.GetValue(ProfilerColumn.GCMemory))).First())
-                        .OrderByDescending(f => ByteSize.Parse(f.GetValue(ProfilerColumn.GCMemory)))
-                        .ToArray();
+                var groupedFunctionData = functionsData.GroupBy(f => f.GetValue(ProfilerColumn.FunctionName));
+
+                switch (statsType)
+                {
+                    case StatsType.MaxValues:
+                        functionStats =
+                            groupedFunctionData
+                                .Select(g =>
+                                    {
+                                        var function = new FunctionData();
+                                        function.values = new FunctionDataValue[columnsToShow.Length];
+                                        function.values[0] = new FunctionDataValue();
+                                        function.values[0].column = ProfilerColumn.FunctionName.ToString();
+                                        function.values[0].value = g.Key;
+                                        for (int i = 1; i < columnsToShow.Length; ++i)
+                                        {
+                                            var column = columnsToShow[i];
+                                            var functionDataValue = new FunctionDataValue();
+                                            functionDataValue.column = column.ToString();
+                                            if (column != ProfilerColumn.GCMemory)
+                                            {
+                                                functionDataValue.value = g.Select(f => float.Parse(f.GetValue(column).Replace("%", ""))).Max().ToString();
+                                            }
+                                            else
+                                            {
+                                                functionDataValue.value = g.Select(f => ByteSize.Parse(f.GetValue(column))).Max().ToString();
+                                            }
+                                            function.values[i] = functionDataValue;
+                                        }
+                                        return function; ;
+                                    })
+                                .OrderByDescending(f => float.Parse(f.GetValue(ProfilerColumn.SelfTime)))
+                                .ToArray();
+                        break;
+                    case StatsType.MinValues:
+                        functionStats =
+                            groupedFunctionData
+                                .Select(g =>
+                                {
+                                    var function = new FunctionData();
+                                    function.values = new FunctionDataValue[columnsToShow.Length];
+                                    function.values[0] = new FunctionDataValue();
+                                    function.values[0].column = ProfilerColumn.FunctionName.ToString();
+                                    function.values[0].value = g.Key;
+                                    for (int i = 1; i < columnsToShow.Length; ++i)
+                                    {
+                                        var column = columnsToShow[i];
+                                        var functionDataValue = new FunctionDataValue();
+                                        functionDataValue.column = column.ToString();
+                                        if (column != ProfilerColumn.GCMemory)
+                                        {
+                                            functionDataValue.value = g.Select(f => float.Parse(f.GetValue(column).Replace("%", ""))).Min().ToString();
+                                        }
+                                        else
+                                        {
+                                            functionDataValue.value = g.Select(f => ByteSize.Parse(f.GetValue(column))).Min().ToString();
+                                        }
+                                        function.values[i] = functionDataValue;
+                                    }
+                                    return function; ;
+                                })
+                                .OrderByDescending(f => float.Parse(f.GetValue(ProfilerColumn.SelfTime)))
+                                .ToArray();
+                        break;
+                    case StatsType.AverageValues:
+                        functionStats =
+                            groupedFunctionData
+                                .Select(g =>
+                                {
+                                    var function = new FunctionData();
+                                    function.values = new FunctionDataValue[columnsToShow.Length];
+                                    function.values[0] = new FunctionDataValue();
+                                    function.values[0].column = ProfilerColumn.FunctionName.ToString();
+                                    function.values[0].value = g.Key;
+                                    for (int i = 1; i < columnsToShow.Length; ++i)
+                                    {
+                                        var column = columnsToShow[i];
+                                        var functionDataValue = new FunctionDataValue();
+                                        functionDataValue.column = column.ToString();
+                                        if (column != ProfilerColumn.GCMemory)
+                                        {
+                                            functionDataValue.value = g.Select(f => float.Parse(f.GetValue(column).Replace("%", ""))).Average().ToString();
+                                        }
+                                        else
+                                        {
+                                            functionDataValue.value = ByteSize.FromBytes(g.Select(f => ByteSize.Parse(f.GetValue(column)).Bytes).Average()).ToString();
+                                        }
+                                        function.values[i] = functionDataValue;
+                                    }
+                                    return function; ;
+                                })
+                                .OrderByDescending(f => float.Parse(f.GetValue(ProfilerColumn.SelfTime)))
+                                .ToArray();
+                        break;
+                }
             }
 
-            if (worstSelfTimeFunctions != null)
+            if (functionStats != null)
             {
-                if (worstSelfTimeTableState == null)
+                if (functionStatsTableState == null)
                 {
-                    worstSelfTimeTableState = new FunctionTableState();
+                    functionStatsTableState = new FunctionTableState(columnsToShow, columnHeaders);
                 }
-                GUILayout.Label("Worst Self Time functions", EditorStyles.boldLabel);
-                TableGUILayout.BeginTable(worstSelfTimeTableState, GUI.skin.GetStyle("OL Box"), GUILayout.MinHeight(100f), GUILayout.MaxHeight(500f));
-                for (int i = 0; i < worstSelfTimeFunctions.Length; ++i)
+                TableGUILayout.BeginTable(functionStatsTableState, GUI.skin.GetStyle("OL Box"), GUILayout.MinHeight(100f), GUILayout.MaxHeight(500f));
+                for (int i = 0; i < functionStats.Length; ++i)
                 {
-                    var values = columnsToShow.Select(c => worstSelfTimeFunctions[i].GetValue(c));
-                    TableGUILayout.AddRow(worstSelfTimeTableState, i, values);
-                }
-                TableGUILayout.EndTable();
-            }
-
-            if (worstGCAllocFunctions != null)
-            {
-                if (worstGCAllocTableState == null)
-                {
-                    worstGCAllocTableState = new FunctionTableState();
-                }
-                GUILayout.Label("Worst GC Alloc functions", EditorStyles.boldLabel);
-                TableGUILayout.BeginTable(worstGCAllocTableState, GUI.skin.GetStyle("OL Box"), GUILayout.MinHeight(100f), GUILayout.MaxHeight(500f));
-                for (int i = 0; i < worstGCAllocFunctions.Length; ++i)
-                {
-                    var values = columnsToShow.Select(c => worstGCAllocFunctions[i].GetValue(c));
-                    TableGUILayout.AddRow(worstGCAllocTableState, i, values);
+                    var values = columnsToShow.Select(c => functionStats[i].GetValue(c));
+                    TableGUILayout.AddRow(functionStatsTableState, i, values);
                 }
                 TableGUILayout.EndTable();
             }
@@ -236,123 +309,6 @@ namespace ProfilerDataExporter
             }
 
             GUILayout.EndHorizontal();
-        }
-
-        private class FunctionTableState : TableGUILayout.ITableState
-        {
-            private SplitterState splitterState;
-
-            public FunctionTableState()
-            {
-                var splitterRelativeSizes = new float[columnsToShow.Length + 1];
-                var splitterMinWidths = new int[columnsToShow.Length + 1];
-                for (int i = 0; i < columnsToShow.Length; i++)
-                {
-                    var column = columnHeaders[columnsToShow[i]];
-                    splitterMinWidths[i] = (int)GUI.skin.GetStyle("OL title").CalcSize(new GUIContent(column)).x;
-                    splitterRelativeSizes[i] = 70f;
-                }
-                splitterMinWidths[columnsToShow.Length] = 16;
-                splitterRelativeSizes[columnsToShow.Length] = 0f;
-                if (columnsToShow[0] == ProfilerColumn.FunctionName)
-                {
-                    splitterRelativeSizes[0] = 400f;
-                    splitterMinWidths[0] = 100;
-                }
-                splitterState = new SplitterState(splitterRelativeSizes, splitterMinWidths, null);
-            }
-
-            IEnumerable<string> TableGUILayout.ITableState.Headers
-            {
-                get
-                {
-                    return columnHeaders.Values;
-                }
-            }
-
-            Vector2 TableGUILayout.ITableState.ScrollPosition
-            {
-                get;
-                set;
-            }
-
-            SplitterState TableGUILayout.ITableState.SplitterState
-            {
-                get
-                {
-                    return splitterState;
-                }
-            }
-        }
-
-        [Serializable]
-        private class FunctionDataValue
-        {
-            public string column;
-            public string value;
-        }
-
-        [Serializable]
-        private class FunctionData
-        {
-            public string functionPath;
-            public FunctionDataValue[] values;
-
-            public string GetValue(ProfilerColumn column)
-            {
-                var columnName = column.ToString();
-                return Array.Find(values, v => v.column == columnName).value;
-            }
-
-            public override string ToString()
-            {
-                return JsonUtility.ToJson(this);
-            }
-
-            public static FunctionData Create(ProfilerProperty property)
-            {
-                var functionData = new FunctionData();
-                var columns = Enum.GetValues(typeof(ProfilerColumn));
-                functionData.values = new FunctionDataValue[columns.Length];
-                functionData.functionPath = property.propertyPath;
-                for (int i = 0; i < columns.Length; ++i)
-                {
-                    var column = (ProfilerColumn)columns.GetValue(i);
-#if UNITY_5_5
-                    if (column == ProfilerColumn.DontSort)
-                    {
-                        continue;
-                    }
-#endif
-                    var functionDataValue = new FunctionDataValue();
-                    functionDataValue.column = column.ToString();
-                    functionDataValue.value = property.GetColumn(column);
-                    functionData.values[i] = functionDataValue;
-                }
-                return functionData;
-            }
-        }
-
-        [Serializable]
-        private class FrameData
-        {
-            public List<FunctionData> functions = new List<FunctionData>();
-
-            public override string ToString()
-            {
-                return JsonUtility.ToJson(this);
-            }
-        }
-
-        [Serializable]
-        private class ProfilerData
-        {
-            public List<FrameData> frames = new List<FrameData>();
-
-            public override string ToString()
-            {
-                return JsonUtility.ToJson(this);
-            }
         }
 
         private void ExportProfilerData()
