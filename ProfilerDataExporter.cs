@@ -59,6 +59,9 @@ namespace ProfilerDataExporter
         private string calculatedPropertyPath;
         private FunctionTableState functionStatsTableState;
         private StatsType statsType;
+        private readonly Func<IEnumerable<float>, float> maxFunc = x => x.Max();
+        private readonly Func<IEnumerable<float>, float> minFunc = x => x.Min();
+        private readonly Func<IEnumerable<float>, float> avgFunc = x => x.Average();
 
         [MenuItem("Window/Profiler Data Exporter")]
         private static void Init()
@@ -135,95 +138,16 @@ namespace ProfilerDataExporter
                 switch (statsType)
                 {
                     case StatsType.MaxValues:
-                        functionStats =
-                            groupedFunctionData
-                                .Select(g =>
-                                    {
-                                        var function = new FunctionData();
-                                        function.values = new FunctionDataValue[columnsToShow.Length];
-                                        function.values[0] = new FunctionDataValue();
-                                        function.values[0].column = ProfilerColumn.FunctionName.ToString();
-                                        function.values[0].value = g.Key;
-                                        for (int i = 1; i < columnsToShow.Length; ++i)
-                                        {
-                                            var column = columnsToShow[i];
-                                            var functionDataValue = new FunctionDataValue();
-                                            functionDataValue.column = column.ToString();
-                                            if (column != ProfilerColumn.GCMemory)
-                                            {
-                                                functionDataValue.value = g.Select(f => float.Parse(f.GetValue(column).Replace("%", ""))).Max().ToString();
-                                            }
-                                            else
-                                            {
-                                                functionDataValue.value = g.Select(f => ByteSize.Parse(f.GetValue(column))).Max().ToString();
-                                            }
-                                            function.values[i] = functionDataValue;
-                                        }
-                                        return function; ;
-                                    })
-                                .OrderByDescending(f => float.Parse(f.GetValue(ProfilerColumn.SelfTime)))
-                                .ToArray();
+                        CalculateFunctionStats(groupedFunctionData, maxFunc);
                         break;
                     case StatsType.MinValues:
-                        functionStats =
-                            groupedFunctionData
-                                .Select(g =>
-                                {
-                                    var function = new FunctionData();
-                                    function.values = new FunctionDataValue[columnsToShow.Length];
-                                    function.values[0] = new FunctionDataValue();
-                                    function.values[0].column = ProfilerColumn.FunctionName.ToString();
-                                    function.values[0].value = g.Key;
-                                    for (int i = 1; i < columnsToShow.Length; ++i)
-                                    {
-                                        var column = columnsToShow[i];
-                                        var functionDataValue = new FunctionDataValue();
-                                        functionDataValue.column = column.ToString();
-                                        if (column != ProfilerColumn.GCMemory)
-                                        {
-                                            functionDataValue.value = g.Select(f => float.Parse(f.GetValue(column).Replace("%", ""))).Min().ToString();
-                                        }
-                                        else
-                                        {
-                                            functionDataValue.value = g.Select(f => ByteSize.Parse(f.GetValue(column))).Min().ToString();
-                                        }
-                                        function.values[i] = functionDataValue;
-                                    }
-                                    return function; ;
-                                })
-                                .OrderByDescending(f => float.Parse(f.GetValue(ProfilerColumn.SelfTime)))
-                                .ToArray();
+                        CalculateFunctionStats(groupedFunctionData, minFunc);
                         break;
                     case StatsType.AverageValues:
-                        functionStats =
-                            groupedFunctionData
-                                .Select(g =>
-                                {
-                                    var function = new FunctionData();
-                                    function.values = new FunctionDataValue[columnsToShow.Length];
-                                    function.values[0] = new FunctionDataValue();
-                                    function.values[0].column = ProfilerColumn.FunctionName.ToString();
-                                    function.values[0].value = g.Key;
-                                    for (int i = 1; i < columnsToShow.Length; ++i)
-                                    {
-                                        var column = columnsToShow[i];
-                                        var functionDataValue = new FunctionDataValue();
-                                        functionDataValue.column = column.ToString();
-                                        if (column != ProfilerColumn.GCMemory)
-                                        {
-                                            functionDataValue.value = g.Select(f => float.Parse(f.GetValue(column).Replace("%", ""))).Average().ToString();
-                                        }
-                                        else
-                                        {
-                                            functionDataValue.value = ByteSize.FromBytes(g.Select(f => ByteSize.Parse(f.GetValue(column)).Bytes).Average()).ToString();
-                                        }
-                                        function.values[i] = functionDataValue;
-                                    }
-                                    return function; ;
-                                })
-                                .OrderByDescending(f => float.Parse(f.GetValue(ProfilerColumn.SelfTime)))
-                                .ToArray();
+                        CalculateFunctionStats(groupedFunctionData, avgFunc);
                         break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
                 }
             }
 
@@ -234,9 +158,10 @@ namespace ProfilerDataExporter
                     functionStatsTableState = new FunctionTableState(columnsToShow, columnHeaders);
                 }
                 TableGUILayout.BeginTable(functionStatsTableState, GUI.skin.GetStyle("OL Box"), GUILayout.MinHeight(100f), GUILayout.MaxHeight(500f));
-                for (int i = 0; i < functionStats.Length; ++i)
+                for (var i = 0; i < functionStats.Length; ++i)
                 {
-                    var values = columnsToShow.Select(c => functionStats[i].GetValue(c));
+                    var functionData = functionStats[i];
+                    var values = columnsToShow.Select(c => functionData.GetValue(c));
                     TableGUILayout.AddRow(functionStatsTableState, i, values);
                 }
                 TableGUILayout.EndTable();
@@ -248,7 +173,7 @@ namespace ProfilerDataExporter
                 if (calculatedPropertyPath != selectedPropertyPath)
                 {
                     var functionData = GetProfilerData(firstFrameIndex, lastFrameIndex, selectedPropertyPath);
-                    var functionFrameData = functionData.frames.Where(f => f.functions.Count > 0);
+                    var functionFrameData = functionData.frames.Where(f => f.functions.Count > 0).ToArray();
                     maxTime = functionFrameData.Max(f => float.Parse(f.functions[0].GetValue(ProfilerColumn.SelfTime)));
                     maxGCAlloc = functionFrameData.Max(f => ByteSize.Parse(f.functions[0].GetValue(ProfilerColumn.GCMemory)));
                     calculatedPropertyPath = selectedPropertyPath;
@@ -259,6 +184,41 @@ namespace ProfilerDataExporter
                 GUILayout.Label(string.Format("Max Self Time = {0}", maxTime));
                 GUILayout.Label(string.Format("Max GC Alloc = {0}", maxGCAlloc));
             }
+        }
+
+        private void CalculateFunctionStats(IEnumerable<IGrouping<string, FunctionData>> groupedFunctionData, Func<IEnumerable<float>, float> operation)
+        {
+            functionStats =
+                groupedFunctionData
+                    .Select(g =>
+                    {
+                        var function = new FunctionData { values = new FunctionDataValue[columnsToShow.Length] };
+                        function.values[0] = new FunctionDataValue
+                        {
+                            column = ProfilerColumn.FunctionName.ToString(),
+                            value = g.Key
+                        };
+                        for (var i = 1; i < columnsToShow.Length; ++i)
+                        {
+                            var column = columnsToShow[i];
+                            var functionDataValue = new FunctionDataValue { column = column.ToString() };
+                            if (column != ProfilerColumn.GCMemory)
+                            {
+                                functionDataValue.value =
+                                    operation(g.Select(f => float.Parse(f.GetValue(column).Replace("%", "")))).ToString("F2");
+                            }
+                            else
+                            {
+                                functionDataValue.value =
+                                    ByteSize.FromBytes(operation(g.Select(f => (float)ByteSize.Parse(f.GetValue(column)).Bytes)))
+                                        .ToString();
+                            }
+                            function.values[i] = functionDataValue;
+                        }
+                        return function;
+                    })
+                    .OrderByDescending(f => float.Parse(f.GetValue(ProfilerColumn.SelfTime)))
+                    .ToArray();
         }
 
         private void DrawExportButtons()
