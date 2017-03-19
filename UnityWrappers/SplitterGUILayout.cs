@@ -10,17 +10,35 @@ namespace ProfilerDataExporter
     /// </summary>
     public class SplitterGUILayout
     {
-        private static Type splitterGUILayoutType = typeof(Editor).Assembly.GetType("UnityEditor.SplitterGUILayout");
+        private static readonly Type SplitterGuiLayoutType = typeof(Editor).Assembly.GetType("UnityEditor.SplitterGUILayout");
 
-        private static int splitterHash = "Splitter".GetHashCode();
+        private static readonly int SplitterHash = "Splitter".GetHashCode();
 
-        public static void EndHorizontalSplit()
+        private static readonly Type GuiLayoutUtilityType = typeof(GUILayoutUtility);
+
+        private static readonly MethodInfo EndLayoutGroupInfo = GuiLayoutUtilityType.GetMethod(
+            "EndLayoutGroup",
+            BindingFlags.DeclaredOnly |
+            BindingFlags.Static |
+            BindingFlags.NonPublic |
+            BindingFlags.InvokeMethod);
+
+        private static readonly MethodInfo BeginLayoutGroupInfo = GuiLayoutUtilityType.GetMethod(
+            "BeginLayoutGroup",
+            BindingFlags.DeclaredOnly |
+            BindingFlags.Static |
+            BindingFlags.NonPublic |
+            BindingFlags.InvokeMethod);
+        private static readonly Func<GUIStyle, GUILayoutOption[], Type, object> BeginLayoutGroupDelegate =
+            (Func<GUIStyle, GUILayoutOption[], Type, object>)
+            Delegate.CreateDelegate(typeof(Func<GUIStyle, GUILayoutOption[], Type, object>), BeginLayoutGroupInfo);
+
+        private static GUISplitterGroup BeginLayoutGroup(GUIStyle style, GUILayoutOption[] options, Type layoutType)
         {
-            guiLayoutUtilityType.InvokeMember("EndLayoutGroup",
-                BindingFlags.DeclaredOnly |
-                BindingFlags.Static | BindingFlags.NonPublic |
-                BindingFlags.InvokeMethod, null, null, null);
+            return new GUISplitterGroup(BeginLayoutGroupDelegate(style, options, layoutType));
         }
+
+        public static readonly Action EndHorizontalSplit = (Action)Delegate.CreateDelegate(typeof(Action), EndLayoutGroupInfo);
 
         public static void BeginHorizontalSplit(SplitterState state, params GUILayoutOption[] options)
         {
@@ -29,19 +47,19 @@ namespace ProfilerDataExporter
 
         public static void BeginSplit(SplitterState state, GUIStyle style, bool vertical, params GUILayoutOption[] options)
         {
-            var gUISplitterGroup = BeginLayoutGroup(style, null, GUISplitterGroup.guiSplitterGroupType);
+            var guiSplitterGroup = BeginLayoutGroup(style, null, GUISplitterGroup.GuiSplitterGroupType);
 
-            state.ID = GUIUtility.GetControlID(SplitterGUILayout.splitterHash, FocusType.Passive);
+            state.ID = GUIUtility.GetControlID(SplitterGUILayout.SplitterHash, FocusType.Passive);
             switch (Event.current.GetTypeForControl(state.ID))
             {
                 case EventType.MouseDown:
                     if (Event.current.button == 0 && Event.current.clickCount == 1)
                     {
-                        int num = (!gUISplitterGroup.isVertical) ? ((int)gUISplitterGroup.rect.x) : ((int)gUISplitterGroup.rect.y);
-                        int num2 = (!gUISplitterGroup.isVertical) ? ((int)Event.current.mousePosition.x) : ((int)Event.current.mousePosition.y);
+                        int num = (!guiSplitterGroup.isVertical) ? ((int)guiSplitterGroup.rect.x) : ((int)guiSplitterGroup.rect.y);
+                        int num2 = (!guiSplitterGroup.isVertical) ? ((int)Event.current.mousePosition.x) : ((int)Event.current.mousePosition.y);
                         for (int i = 0; i < state.relativeSizes.Length - 1; i++)
                         {
-                            if (((!gUISplitterGroup.isVertical) ? new Rect(state.xOffset + (float)num + (float)state.realSizes[i] - (float)(state.splitSize / 2), gUISplitterGroup.rect.y, (float)state.splitSize, gUISplitterGroup.rect.height) : new Rect(state.xOffset + gUISplitterGroup.rect.x, (float)(num + state.realSizes[i] - state.splitSize / 2), gUISplitterGroup.rect.width, (float)state.splitSize)).Contains(Event.current.mousePosition))
+                            if (((!guiSplitterGroup.isVertical) ? new Rect(state.xOffset + (float)num + (float)state.realSizes[i] - (float)(state.splitSize / 2), guiSplitterGroup.rect.y, (float)state.splitSize, guiSplitterGroup.rect.height) : new Rect(state.xOffset + guiSplitterGroup.rect.x, (float)(num + state.realSizes[i] - state.splitSize / 2), guiSplitterGroup.rect.width, (float)state.splitSize)).Contains(Event.current.mousePosition))
                             {
                                 state.splitterInitialOffset = num2;
                                 state.currentActiveSplitter = i;
@@ -65,7 +83,7 @@ namespace ProfilerDataExporter
                 case EventType.MouseDrag:
                     if (GUIUtility.hotControl == state.ID && state.currentActiveSplitter >= 0)
                     {
-                        int num2 = (!gUISplitterGroup.isVertical) ? ((int)Event.current.mousePosition.x) : ((int)Event.current.mousePosition.y);
+                        int num2 = (!guiSplitterGroup.isVertical) ? ((int)Event.current.mousePosition.x) : ((int)Event.current.mousePosition.y);
                         int num3 = num2 - state.splitterInitialOffset;
                         if (num3 != 0)
                         {
@@ -77,32 +95,22 @@ namespace ProfilerDataExporter
                     break;
                 case EventType.Repaint:
                     {
-                        int num4 = (!gUISplitterGroup.isVertical) ? ((int)gUISplitterGroup.rect.x) : ((int)gUISplitterGroup.rect.y);
+                        int num4 = (!guiSplitterGroup.isVertical) ? ((int)guiSplitterGroup.rect.x) : ((int)guiSplitterGroup.rect.y);
                         for (int j = 0; j < state.relativeSizes.Length - 1; j++)
                         {
-                            Rect position = (!gUISplitterGroup.isVertical) ? new Rect(state.xOffset + (float)num4 + (float)state.realSizes[j] - (float)(state.splitSize / 2), gUISplitterGroup.rect.y, (float)state.splitSize, gUISplitterGroup.rect.height) : new Rect(state.xOffset + gUISplitterGroup.rect.x, (float)(num4 + state.realSizes[j] - state.splitSize / 2), gUISplitterGroup.rect.width, (float)state.splitSize);
-                            EditorGUIUtility.AddCursorRect(position, (!gUISplitterGroup.isVertical) ? MouseCursor.SplitResizeLeftRight : MouseCursor.ResizeVertical, state.ID);
+                            Rect position = (!guiSplitterGroup.isVertical) ? new Rect(state.xOffset + (float)num4 + (float)state.realSizes[j] - (float)(state.splitSize / 2), guiSplitterGroup.rect.y, (float)state.splitSize, guiSplitterGroup.rect.height) : new Rect(state.xOffset + guiSplitterGroup.rect.x, (float)(num4 + state.realSizes[j] - state.splitSize / 2), guiSplitterGroup.rect.width, (float)state.splitSize);
+                            EditorGUIUtility.AddCursorRect(position, (!guiSplitterGroup.isVertical) ? MouseCursor.SplitResizeLeftRight : MouseCursor.ResizeVertical, state.ID);
                             num4 += state.realSizes[j];
                         }
                         break;
                     }
                 case EventType.Layout:
-                    gUISplitterGroup.state = state;
-                    gUISplitterGroup.resetCoords = false;
-                    gUISplitterGroup.isVertical = vertical;
-                    gUISplitterGroup.ApplyOptions(options);
+                    guiSplitterGroup.state = state;
+                    guiSplitterGroup.resetCoords = false;
+                    guiSplitterGroup.isVertical = vertical;
+                    guiSplitterGroup.ApplyOptions(options);
                     break;
             }
-        }
-
-        private static Type guiLayoutUtilityType = typeof(GUILayoutUtility);
-
-        private static GUISplitterGroup BeginLayoutGroup(GUIStyle style, GUILayoutOption[] options, Type layoutType)
-        {
-            return new GUISplitterGroup(guiLayoutUtilityType.InvokeMember("BeginLayoutGroup",
-                BindingFlags.DeclaredOnly |
-                BindingFlags.Static | BindingFlags.NonPublic |
-                BindingFlags.InvokeMethod, null, null, new object[] { style, options, layoutType }));
         }
 
         /// <summary>
@@ -110,8 +118,8 @@ namespace ProfilerDataExporter
         /// </summary>
         private class GUISplitterGroup
         {
-            public static Type guiSplitterGroupType = splitterGUILayoutType.GetNestedType("GUISplitterGroup", BindingFlags.NonPublic);
-            private object guiSplitterGroup;
+            public static readonly Type GuiSplitterGroupType = SplitterGuiLayoutType.GetNestedType("GUISplitterGroup", BindingFlags.NonPublic);
+            private readonly object guiSplitterGroup;
             private SplitterState myState;
 
             public GUISplitterGroup(object guiSplitterGroup)
@@ -123,13 +131,13 @@ namespace ProfilerDataExporter
             {
                 get
                 {
-                    return (bool)guiSplitterGroupType.InvokeMember("isVertical",
+                    return (bool)GuiSplitterGroupType.InvokeMember("isVertical",
                     BindingFlags.Public | BindingFlags.NonPublic |
                     BindingFlags.Instance | BindingFlags.GetField, null, guiSplitterGroup, null);
                 }
                 internal set
                 {
-                    guiSplitterGroupType.InvokeMember("isVertical",
+                    GuiSplitterGroupType.InvokeMember("isVertical",
                          BindingFlags.Public | BindingFlags.NonPublic |
                          BindingFlags.Instance | BindingFlags.SetField, null, guiSplitterGroup, new object[] { value });
                 }
@@ -138,7 +146,7 @@ namespace ProfilerDataExporter
             {
                 get
                 {
-                    return (Rect)guiSplitterGroupType.InvokeMember("rect",
+                    return (Rect)GuiSplitterGroupType.InvokeMember("rect",
                     BindingFlags.Public | BindingFlags.NonPublic |
                     BindingFlags.Instance | BindingFlags.GetField, null, guiSplitterGroup, null);
                 }
@@ -147,13 +155,13 @@ namespace ProfilerDataExporter
             {
                 get
                 {
-                    return (bool)guiSplitterGroupType.InvokeMember("resetCoords",
+                    return (bool)GuiSplitterGroupType.InvokeMember("resetCoords",
                     BindingFlags.Public | BindingFlags.NonPublic |
                     BindingFlags.Instance | BindingFlags.GetField, null, guiSplitterGroup, null);
                 }
                 internal set
                 {
-                    guiSplitterGroupType.InvokeMember("resetCoords",
+                    GuiSplitterGroupType.InvokeMember("resetCoords",
                          BindingFlags.Public | BindingFlags.NonPublic |
                          BindingFlags.Instance | BindingFlags.SetField, null, guiSplitterGroup, new object[] { value });
                 }
@@ -168,7 +176,7 @@ namespace ProfilerDataExporter
                 internal set
                 {
                     myState = value;
-                    guiSplitterGroupType.InvokeMember("state",
+                    GuiSplitterGroupType.InvokeMember("state",
                          BindingFlags.DeclaredOnly |
                          BindingFlags.Public | BindingFlags.NonPublic |
                          BindingFlags.Instance | BindingFlags.SetField, null, guiSplitterGroup, new object[] { value.splitter });
@@ -177,7 +185,7 @@ namespace ProfilerDataExporter
 
             public void ApplyOptions(GUILayoutOption[] options)
             {
-                guiSplitterGroupType.InvokeMember("ApplyOptions",
+                GuiSplitterGroupType.InvokeMember("ApplyOptions",
                     BindingFlags.Public | BindingFlags.NonPublic |
                     BindingFlags.Instance | BindingFlags.InvokeMethod, null, guiSplitterGroup, new object[] { options });
             }

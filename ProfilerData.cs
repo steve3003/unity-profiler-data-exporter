@@ -14,6 +14,38 @@ namespace ProfilerDataExporter
         {
             return JsonUtility.ToJson(this);
         }
+
+        public static ProfilerData GetProfilerData(int firstFrameIndex, int lastFrameIndex, string selectedPropertyPath = "")
+        {
+            var profilerSortColumn = ProfilerColumn.TotalTime;
+            var viewType = ProfilerViewType.Hierarchy;
+
+            var profilerData = new ProfilerData();
+            for (int frameIndex = firstFrameIndex; frameIndex <= lastFrameIndex; ++frameIndex)
+            {
+                var property = new ProfilerProperty();
+                property.SetRoot(frameIndex, profilerSortColumn, viewType);
+                property.onlyShowGPUSamples = false;
+
+                var frameData = new FrameData();
+                const bool enterChildren = true;
+                while (property.Next(enterChildren))
+                {
+                    bool shouldSaveProperty = String.IsNullOrEmpty(selectedPropertyPath) || property.propertyPath == selectedPropertyPath;
+                    if (shouldSaveProperty)
+                    {
+                        var functionData = FunctionData.Create(property);
+                        frameData.functions.Add(functionData);
+                        //Debug.Log(functionData.ToString());
+                    }
+                }
+                property.Cleanup();
+                profilerData.frames.Add(frameData);
+                //Debug.Log(frameData.ToString());
+            }
+            //Debug.Log(profilerData.ToString());
+            return profilerData;
+        }
     }
 
     [Serializable]
@@ -30,13 +62,29 @@ namespace ProfilerDataExporter
     [Serializable]
     public class FunctionData
     {
+        private static readonly string[] ColumnNames = Enum.GetNames(typeof(ProfilerColumn));
+
         public string functionPath;
         public FunctionDataValue[] values;
 
         public string GetValue(ProfilerColumn column)
         {
-            var columnName = column.ToString();
-            return Array.Find(values, v => v.column == columnName).value;
+            var columnName = ColumnNames[(int)column];
+            return FindDataValue(columnName).value;
+        }
+
+        private FunctionDataValue FindDataValue(string columnName)
+        {
+            int length = values.Length;
+            for (int i = 0; i < length; ++i)
+            {
+                var value = values[i];
+                if (value.column == columnName)
+                {
+                    return value;
+                }
+            }
+            return default(FunctionDataValue);
         }
 
         public override string ToString()

@@ -1,6 +1,4 @@
-﻿#undef USE_AUTO_REPAINT
-
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEditor;
 using UnityEditorInternal;
 using System;
@@ -15,18 +13,7 @@ namespace ProfilerDataExporter
 {
     public class ProfilerDataExporter : EditorWindow
     {
-#if USE_AUTO_REPAINT
-    private const float editorUpdateTime = 1f;
-    private float lastUpdateTime = 0;
-#endif
-        private enum StatsType
-        {
-            MaxValues,
-            AverageValues,
-            MinValues
-        }
-
-        private static ProfilerColumn[] columnsToShow = new ProfilerColumn[]
+        private static readonly ProfilerColumn[] ColumnsToShow = new ProfilerColumn[]
         {
             ProfilerColumn.FunctionName,
             ProfilerColumn.TotalPercent,
@@ -37,7 +24,7 @@ namespace ProfilerDataExporter
             ProfilerColumn.SelfTime,
         };
 
-        private static Dictionary<ProfilerColumn, string> columnHeaders = new Dictionary<ProfilerColumn, string>
+        private static readonly Dictionary<ProfilerColumn, string> ColumnHeaders = new Dictionary<ProfilerColumn, string>
         {
             { ProfilerColumn.FunctionName, "Function"},
             { ProfilerColumn.TotalPercent, "Total"},
@@ -49,19 +36,13 @@ namespace ProfilerDataExporter
         };
 
         private string filePath = @"profiler_data.json";
-        private int currentframe = -1;
         private Type profilerWindowType;
         private FieldInfo currentFrameFieldInfo;
         private Vector2 scrollPosition;
-        private FunctionData[] functionStats;
-        private ByteSize maxGCAlloc;
-        private float maxTime;
-        private string calculatedPropertyPath;
+        private string[][] functionStats;
         private FunctionTableState functionStatsTableState;
         private StatsType statsType;
-        private readonly Func<IEnumerable<float>, float> maxFunc = x => x.Max();
-        private readonly Func<IEnumerable<float>, float> minFunc = x => x.Min();
-        private readonly Func<IEnumerable<float>, float> avgFunc = x => x.Average();
+        private EditorWindow profilerWindow;
 
         [MenuItem("Window/Profiler Data Exporter")]
         private static void Init()
@@ -72,38 +53,17 @@ namespace ProfilerDataExporter
 
         private void OnEnable()
         {
-#if USE_AUTO_REPAINT
-        EditorApplication.update += EditorUpdate;
-#endif
             Assembly assem = typeof(Editor).Assembly;
             profilerWindowType = assem.GetType("UnityEditor.ProfilerWindow");
             currentFrameFieldInfo = profilerWindowType.GetField("m_CurrentFrame", BindingFlags.NonPublic | BindingFlags.Instance);
         }
 
-#if USE_AUTO_REPAINT
-    private void OnDisable()
-    {
-        EditorApplication.update -= EditorUpdate;
-    }
-#endif
-
-#if USE_AUTO_REPAINT
-    private void EditorUpdate()
-    {
-        var time = Time.realtimeSinceStartup;
-        var deltaTime = time - lastUpdateTime;
-        if (deltaTime >= editorUpdateTime)
-        {
-            lastUpdateTime = time;
-            Repaint();
-        }
-    }
-#endif
-
         private void OnGUI()
         {
-            var profilerWindow = EditorWindow.GetWindow(profilerWindowType);
-            currentframe = (int)currentFrameFieldInfo.GetValue(profilerWindow);
+            if (!profilerWindow)
+            {
+                profilerWindow = GetWindow(profilerWindowType);
+            }
 
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
 
@@ -116,109 +76,34 @@ namespace ProfilerDataExporter
 
         private void DrawStats()
         {
-            var firstFrameIndex = ProfilerDriver.firstFrameIndex;
-            var lastFrameIndex = ProfilerDriver.lastFrameIndex;
-
             GUILayout.BeginHorizontal();
             GUILayout.Label("Statistics", EditorStyles.boldLabel, GUILayout.ExpandWidth(false));
             statsType = (StatsType)EditorGUILayout.EnumPopup(statsType, GUILayout.ExpandWidth(false));
             var calulateStatistics = GUILayout.Button("Calculate", GUILayout.ExpandWidth(false));
             GUILayout.EndHorizontal();
-            if (currentframe > 0)
-            {
-                GUILayout.Label(string.Format("Current frame = {0}", currentframe));
-            }
 
             if (calulateStatistics)
             {
-                var profilerData = GetProfilerData(firstFrameIndex, lastFrameIndex);
-                var functionsData = profilerData.frames.SelectMany(f => f.functions);
-                var groupedFunctionData = functionsData.GroupBy(f => f.GetValue(ProfilerColumn.FunctionName));
+                var statsCalculator = StatsCalculatorProvider.GetStatsCalculator(statsType);
+                var stats = statsCalculator.CalculateStats(ColumnsToShow);
+                functionStats = stats.Select(f => ColumnsToShow.Select(f.GetValue).ToArray()).ToArray();
+            }
 
-                switch (statsType)
-                {
-                    case StatsType.MaxValues:
-                        CalculateFunctionStats(groupedFunctionData, maxFunc);
-                        break;
-                    case StatsType.MinValues:
-                        CalculateFunctionStats(groupedFunctionData, minFunc);
-                        break;
-                    case StatsType.AverageValues:
-                        CalculateFunctionStats(groupedFunctionData, avgFunc);
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
+            if (functionStatsTableState == null)
+            {
+                functionStatsTableState = new FunctionTableState(ColumnsToShow, ColumnHeaders);
             }
 
             if (functionStats != null)
             {
-                if (functionStatsTableState == null)
-                {
-                    functionStatsTableState = new FunctionTableState(columnsToShow, columnHeaders);
-                }
                 TableGUILayout.BeginTable(functionStatsTableState, GUI.skin.GetStyle("OL Box"), GUILayout.MinHeight(100f), GUILayout.MaxHeight(500f));
                 for (var i = 0; i < functionStats.Length; ++i)
                 {
                     var functionData = functionStats[i];
-                    var values = columnsToShow.Select(c => functionData.GetValue(c));
-                    TableGUILayout.AddRow(functionStatsTableState, i, values);
+                    TableGUILayout.AddRow(functionStatsTableState, i, functionData);
                 }
                 TableGUILayout.EndTable();
             }
-
-            var selectedPropertyPath = ProfilerDriver.selectedPropertyPath;
-            if (!string.IsNullOrEmpty(selectedPropertyPath))
-            {
-                if (calculatedPropertyPath != selectedPropertyPath)
-                {
-                    var functionData = GetProfilerData(firstFrameIndex, lastFrameIndex, selectedPropertyPath);
-                    var functionFrameData = functionData.frames.Where(f => f.functions.Count > 0).ToArray();
-                    maxTime = functionFrameData.Max(f => float.Parse(f.functions[0].GetValue(ProfilerColumn.SelfTime)));
-                    maxGCAlloc = functionFrameData.Max(f => ByteSize.Parse(f.functions[0].GetValue(ProfilerColumn.GCMemory)));
-                    calculatedPropertyPath = selectedPropertyPath;
-                }
-
-                GUILayout.Label("Function Statistics", EditorStyles.boldLabel);
-                GUILayout.Label(string.Format("Selected function = {0}", selectedPropertyPath));
-                GUILayout.Label(string.Format("Max Self Time = {0}", maxTime));
-                GUILayout.Label(string.Format("Max GC Alloc = {0}", maxGCAlloc));
-            }
-        }
-
-        private void CalculateFunctionStats(IEnumerable<IGrouping<string, FunctionData>> groupedFunctionData, Func<IEnumerable<float>, float> operation)
-        {
-            functionStats =
-                groupedFunctionData
-                    .Select(g =>
-                    {
-                        var function = new FunctionData { values = new FunctionDataValue[columnsToShow.Length] };
-                        function.values[0] = new FunctionDataValue
-                        {
-                            column = ProfilerColumn.FunctionName.ToString(),
-                            value = g.Key
-                        };
-                        for (var i = 1; i < columnsToShow.Length; ++i)
-                        {
-                            var column = columnsToShow[i];
-                            var functionDataValue = new FunctionDataValue { column = column.ToString() };
-                            if (column != ProfilerColumn.GCMemory)
-                            {
-                                functionDataValue.value =
-                                    operation(g.Select(f => float.Parse(f.GetValue(column).Replace("%", "")))).ToString("F2");
-                            }
-                            else
-                            {
-                                functionDataValue.value =
-                                    ByteSize.FromBytes(operation(g.Select(f => (float)ByteSize.Parse(f.GetValue(column)).Bytes)))
-                                        .ToString();
-                            }
-                            function.values[i] = functionDataValue;
-                        }
-                        return function;
-                    })
-                    .OrderByDescending(f => float.Parse(f.GetValue(ProfilerColumn.SelfTime)))
-                    .ToArray();
         }
 
         private void DrawExportButtons()
@@ -230,10 +115,11 @@ namespace ProfilerDataExporter
             {
                 ExportProfilerData();
             }
+            var currentframe = (int)currentFrameFieldInfo.GetValue(profilerWindow);
             GUI.enabled = currentframe > 0;
             if (GUILayout.Button("Current Frame Data"))
             {
-                ExportCurrentFrameData();
+                ExportCurrentFrameData(currentframe);
             }
             GUI.enabled = true;
             GUI.enabled = !string.IsNullOrEmpty(ProfilerDriver.selectedPropertyPath);
@@ -278,7 +164,7 @@ namespace ProfilerDataExporter
             ExtractData(firstFrameIndex, lastFrameIndex);
         }
 
-        private void ExportCurrentFrameData()
+        private void ExportCurrentFrameData(int currentframe)
         {
             if (currentframe > -1)
             {
@@ -295,40 +181,8 @@ namespace ProfilerDataExporter
 
         private void ExtractData(int firstFrameIndex, int lastFrameIndex, string selectedPropertyPath = "")
         {
-            var profilerData = GetProfilerData(firstFrameIndex, lastFrameIndex, selectedPropertyPath);
+            var profilerData = ProfilerData.GetProfilerData(firstFrameIndex, lastFrameIndex, selectedPropertyPath);
             File.WriteAllText(filePath, profilerData.ToString());
-        }
-
-        private static ProfilerData GetProfilerData(int firstFrameIndex, int lastFrameIndex, string selectedPropertyPath = "")
-        {
-            var profilerSortColumn = ProfilerColumn.TotalTime;
-            var viewType = ProfilerViewType.Hierarchy;
-
-            var profilerData = new ProfilerData();
-            for (int frameIndex = firstFrameIndex; frameIndex <= lastFrameIndex; ++frameIndex)
-            {
-                var property = new ProfilerProperty();
-                property.SetRoot(frameIndex, profilerSortColumn, viewType);
-                property.onlyShowGPUSamples = false;
-
-                var frameData = new FrameData();
-                bool enterChildren = true;
-                while (property.Next(enterChildren))
-                {
-                    bool shouldSaveProperty = string.IsNullOrEmpty(selectedPropertyPath) || property.propertyPath == selectedPropertyPath;
-                    if (shouldSaveProperty)
-                    {
-                        var functionData = FunctionData.Create(property);
-                        frameData.functions.Add(functionData);
-                        //Debug.Log(functionData.ToString());
-                    }
-                }
-                property.Cleanup();
-                profilerData.frames.Add(frameData);
-                //Debug.Log(frameData.ToString());
-            }
-            //Debug.Log(profilerData.ToString());
-            return profilerData;
         }
     }
 
