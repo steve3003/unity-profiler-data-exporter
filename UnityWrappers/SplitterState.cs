@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Reflection;
 using UnityEditor;
+using UnityEngine;
 
 namespace ProfilerDataExporter
 {
@@ -9,45 +10,45 @@ namespace ProfilerDataExporter
     /// </summary>
     public class SplitterState
     {
-        private static Type splitterStateType = typeof(Editor).Assembly.GetType("UnityEditor.SplitterState");
+        private static readonly Type SplitterStateType = typeof(Editor).Assembly.GetType("UnityEditor.SplitterState");
         public object splitter = null;
+        public int[] realSizes;
+
+        private static readonly FieldInfo RealSizesInfo = SplitterStateType.GetField(
+            "realSizes",
+            BindingFlags.DeclaredOnly |
+            BindingFlags.Public |
+            BindingFlags.NonPublic |
+            BindingFlags.Instance |
+            BindingFlags.GetField);
 
         public SplitterState(float[] relativeSizes, int[] minSizes, int[] maxSizes)
         {
-            splitter = splitterStateType.InvokeMember(null,
+            splitter = SplitterStateType.InvokeMember(null,
             BindingFlags.DeclaredOnly |
             BindingFlags.Public | BindingFlags.NonPublic |
             BindingFlags.Instance | BindingFlags.CreateInstance, null, null, new object[] { relativeSizes, minSizes, maxSizes });
+            realSizes = (int[])RealSizesInfo.GetValue(splitter);
         }
 
         public SplitterState(object splitter)
         {
             this.splitter = splitter;
-        }
-
-        public int[] realSizes
-        {
-            get
-            {
-                return (int[])splitterStateType.InvokeMember("realSizes",
-                BindingFlags.DeclaredOnly |
-                BindingFlags.Public | BindingFlags.NonPublic |
-                BindingFlags.Instance | BindingFlags.GetField, null, splitter, null);
-            }
+            realSizes = (int[])RealSizesInfo.GetValue(splitter);
         }
 
         public int ID
         {
             get
             {
-                return (int)splitterStateType.InvokeMember("ID",
+                return (int)SplitterStateType.InvokeMember("ID",
                     BindingFlags.DeclaredOnly |
                     BindingFlags.Public | BindingFlags.NonPublic |
                     BindingFlags.Instance | BindingFlags.GetField, null, splitter, null);
             }
             internal set
             {
-                splitterStateType.InvokeMember("ID",
+                SplitterStateType.InvokeMember("ID",
                      BindingFlags.DeclaredOnly |
                      BindingFlags.Public | BindingFlags.NonPublic |
                      BindingFlags.Instance | BindingFlags.SetField, null, splitter, new object[] { value });
@@ -58,7 +59,7 @@ namespace ProfilerDataExporter
         {
             get
             {
-                return (float)splitterStateType.InvokeMember("xOffset",
+                return (float)SplitterStateType.InvokeMember("xOffset",
                     BindingFlags.DeclaredOnly |
                     BindingFlags.Public | BindingFlags.NonPublic |
                     BindingFlags.Instance | BindingFlags.GetField, null, splitter, null);
@@ -68,7 +69,7 @@ namespace ProfilerDataExporter
         {
             get
             {
-                return (int)splitterStateType.InvokeMember("splitSize",
+                return (int)SplitterStateType.InvokeMember("splitSize",
                     BindingFlags.DeclaredOnly |
                     BindingFlags.Public | BindingFlags.NonPublic |
                     BindingFlags.Instance | BindingFlags.GetField, null, splitter, null);
@@ -78,7 +79,7 @@ namespace ProfilerDataExporter
         {
             get
             {
-                return (float[])splitterStateType.InvokeMember("relativeSizes",
+                return (float[])SplitterStateType.InvokeMember("relativeSizes",
                     BindingFlags.DeclaredOnly |
                     BindingFlags.Public | BindingFlags.NonPublic |
                     BindingFlags.Instance | BindingFlags.GetField, null, splitter, null);
@@ -88,14 +89,14 @@ namespace ProfilerDataExporter
         {
             get
             {
-                return (int)splitterStateType.InvokeMember("splitterInitialOffset",
+                return (int)SplitterStateType.InvokeMember("splitterInitialOffset",
                     BindingFlags.DeclaredOnly |
                     BindingFlags.Public | BindingFlags.NonPublic |
                     BindingFlags.Instance | BindingFlags.GetField, null, splitter, null);
             }
             internal set
             {
-                splitterStateType.InvokeMember("splitterInitialOffset",
+                SplitterStateType.InvokeMember("splitterInitialOffset",
                      BindingFlags.DeclaredOnly |
                      BindingFlags.Public | BindingFlags.NonPublic |
                      BindingFlags.Instance | BindingFlags.SetField, null, splitter, new object[] { value });
@@ -105,14 +106,14 @@ namespace ProfilerDataExporter
         {
             get
             {
-                return (int)splitterStateType.InvokeMember("currentActiveSplitter",
+                return (int)SplitterStateType.InvokeMember("currentActiveSplitter",
                     BindingFlags.DeclaredOnly |
                     BindingFlags.Public | BindingFlags.NonPublic |
                     BindingFlags.Instance | BindingFlags.GetField, null, splitter, null);
             }
             internal set
             {
-                splitterStateType.InvokeMember("currentActiveSplitter",
+                SplitterStateType.InvokeMember("currentActiveSplitter",
                      BindingFlags.DeclaredOnly |
                      BindingFlags.Public | BindingFlags.NonPublic |
                      BindingFlags.Instance | BindingFlags.SetField, null, splitter, new object[] { value });
@@ -121,14 +122,14 @@ namespace ProfilerDataExporter
 
         public void RealToRelativeSizes()
         {
-            splitterStateType.InvokeMember("RealToRelativeSizes",
+            SplitterStateType.InvokeMember("RealToRelativeSizes",
                     BindingFlags.Public | BindingFlags.NonPublic |
                     BindingFlags.Instance | BindingFlags.InvokeMethod, null, splitter, null);
         }
 
         public void DoSplitter(int currentActiveSplitter, int v, int num3)
         {
-            splitterStateType.InvokeMember("DoSplitter",
+            SplitterStateType.InvokeMember("DoSplitter",
                     BindingFlags.Public | BindingFlags.NonPublic |
                     BindingFlags.Instance | BindingFlags.InvokeMethod, null, splitter, new object[] { currentActiveSplitter, v, num3 });
         }
