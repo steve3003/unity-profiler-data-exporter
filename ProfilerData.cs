@@ -19,11 +19,11 @@ namespace ProfilerDataExporter
         {
             var profilerSortColumn = ProfilerColumn.TotalTime;
             var viewType = ProfilerViewType.Hierarchy;
+            var property = new ProfilerProperty();
 
             var profilerData = new ProfilerData();
             for (int frameIndex = firstFrameIndex; frameIndex <= lastFrameIndex; ++frameIndex)
             {
-                var property = new ProfilerProperty();
                 property.SetRoot(frameIndex, profilerSortColumn, viewType);
                 property.onlyShowGPUSamples = false;
 
@@ -31,7 +31,7 @@ namespace ProfilerDataExporter
                 const bool enterChildren = true;
                 while (property.Next(enterChildren))
                 {
-                    bool shouldSaveProperty = String.IsNullOrEmpty(selectedPropertyPath) || property.propertyPath == selectedPropertyPath;
+                    bool shouldSaveProperty = string.IsNullOrEmpty(selectedPropertyPath) || property.propertyPath == selectedPropertyPath;
                     if (shouldSaveProperty)
                     {
                         var functionData = FunctionData.Create(property);
