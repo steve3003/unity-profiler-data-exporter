@@ -101,7 +101,7 @@ namespace ProfilerDataExporter
             for (int i = 0; i < columns.Length; ++i)
             {
                 var column = (ProfilerColumn)columns.GetValue(i);
-#if UNITY_5_5
+#if UNITY_5_5_OR_NEWER
                 if (column == ProfilerColumn.DontSort)
                 {
                     continue;
