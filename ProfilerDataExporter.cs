@@ -86,7 +86,7 @@ namespace ProfilerDataExporter
             {
                 var statsCalculator = StatsCalculatorProvider.GetStatsCalculator(statsType);
                 var stats = statsCalculator.CalculateStats(ColumnsToShow);
-                functionStats = stats.Select(f => ColumnsToShow.Select(f.GetValue).ToArray()).ToArray();
+                functionStats = stats.Select<FunctionData, string[]>(f => ColumnsToShow.Select<ProfilerColumn, string>(f.GetValue).ToArray()).ToArray();
             }
 
             if (functionStatsTableState == null)
