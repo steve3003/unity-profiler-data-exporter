@@ -51,7 +51,7 @@ namespace ProfilerDataExporter
 
             var functionStats =
                 groupedFunctionData
-                    .Select(AggregateFunction)
+                    .Select<IGrouping<string, FunctionData>, FunctionData>(AggregateFunction)
                     .OrderByDescending(GetSelfTime)
                     .ToArray();
             return functionStats;
