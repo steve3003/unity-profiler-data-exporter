@@ -6,8 +6,6 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.IO;
 using System.Diagnostics;
-using System.Linq;
-using ByteSizeLib;
 
 namespace ProfilerDataExporter
 {
@@ -39,7 +37,8 @@ namespace ProfilerDataExporter
         private Type profilerWindowType;
         private FieldInfo currentFrameFieldInfo;
         private Vector2 scrollPosition;
-        private string[][] functionStats;
+        private IAllocator<List<string>> listPool = new ObjectPool<List<string>>(new ListFactory<string>(ColumnsToShow.Length), 50);
+        private List<List<string>> functionStats = new List<List<string>>(50);
         private FunctionTableState functionStatsTableState;
         private StatsType statsType;
         private EditorWindow profilerWindow;
@@ -86,7 +85,7 @@ namespace ProfilerDataExporter
             {
                 var statsCalculator = StatsCalculatorProvider.GetStatsCalculator(statsType);
                 var stats = statsCalculator.CalculateStats(ColumnsToShow);
-                functionStats = stats.Select<FunctionData, string[]>(f => ColumnsToShow.Select<ProfilerColumn, string>(f.GetValue).ToArray()).ToArray();
+                UpdateFunctionStats(stats);
             }
 
             if (functionStatsTableState == null)
@@ -97,12 +96,38 @@ namespace ProfilerDataExporter
             if (functionStats != null)
             {
                 TableGUILayout.BeginTable(functionStatsTableState, GUI.skin.GetStyle("OL Box"), GUILayout.MinHeight(100f), GUILayout.MaxHeight(500f));
-                for (var i = 0; i < functionStats.Length; ++i)
+                for (var i = 0; i < functionStats.Count; ++i)
                 {
                     var functionData = functionStats[i];
                     TableGUILayout.AddRow(functionStatsTableState, i, functionData);
                 }
                 TableGUILayout.EndTable();
+            }
+        }
+
+        private void UpdateFunctionStats(FunctionData[] stats)
+        {
+            for (int i = 0; i < functionStats.Count; ++i)
+            {
+                var list = functionStats[i];
+                list.Clear();
+                listPool.Free(list);
+            }
+            functionStats.Clear();
+
+            var statsLength = stats.Length;
+            var columnsToShowLength = ColumnsToShow.Length;
+            for (int i = 0; i < statsLength; ++i)
+            {
+                var stat = stats[i];
+                var functionStat = listPool.Allocate();
+                for (int j = 0; j < columnsToShowLength; ++j)
+                {
+                    var column = ColumnsToShow[j];
+                    var value = stat.GetValue(column);
+                    functionStat.Add(value);
+                }
+                functionStats.Add(functionStat);
             }
         }
 
