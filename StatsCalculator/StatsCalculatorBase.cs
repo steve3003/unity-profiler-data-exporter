@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using ByteSizeLib;
 using UnityEditorInternal;
 
@@ -12,12 +11,13 @@ namespace ProfilerDataExporter
         private static readonly string[] ProfilerColumnNames = Enum.GetNames(typeof(ProfilerColumn));
 
         private static readonly Func<FunctionData, float> GetSelfTime = f => float.Parse(f.GetValue(ProfilerColumn.SelfTime));
-        private static readonly Func<FrameData, IEnumerable<FunctionData>> GetFunctions = f => f.functions;
-        private static readonly Func<FunctionData, string> GetFunctionName = f => f.GetValue(ProfilerColumn.FunctionName);
 
         private static Func<FunctionData, float>[] getFunctionValues;
 
         private ProfilerColumn[] columnsToShow;
+
+        private List<float> values = new List<float>();
+        private Dictionary<string, List<FunctionData>> functionsDataByName = new Dictionary<string, List<FunctionData>>();
 
         protected StatsCalculatorBase()
         {
@@ -39,60 +39,90 @@ namespace ProfilerDataExporter
             }
         }
 
-        public FunctionData[] CalculateStats(ProfilerColumn[] columnsToShow)
+        public IList<FunctionData> CalculateStats(ProfilerColumn[] columnsToShow)
         {
-            var firstFrameIndex = ProfilerDriver.firstFrameIndex;
-            var lastFrameIndex = ProfilerDriver.lastFrameIndex;
-            var profilerData = ProfilerData.GetProfilerData(firstFrameIndex, lastFrameIndex);
-            var functionsData = profilerData.frames.SelectMany(GetFunctions);
-            var groupedFunctionData = functionsData.GroupBy(GetFunctionName).ToArray();
+            using (Profiler.AddSample(Profiler.SamplerType.CalculateStats))
+            {
+                var firstFrameIndex = ProfilerDriver.firstFrameIndex;
+                var lastFrameIndex = ProfilerDriver.lastFrameIndex;
+                var profilerData = ProfilerData.GetProfilerData(firstFrameIndex, lastFrameIndex);
 
-            this.columnsToShow = columnsToShow;
+                var frames = profilerData.frames;
+                for (int i = 0; i < frames.Count; ++i)
+                {
+                    var frameData = frames[i];
+                    var functions = frameData.functions;
+                    for (int j = 0; j < functions.Count; ++j)
+                    {
+                        var functionData = functions[j];
+                        var functionName = functionData.GetValue(ProfilerColumn.FunctionName);
+                        List<FunctionData> functionsData;
+                        if (!functionsDataByName.TryGetValue(functionName, out functionsData))
+                        {
+                            functionsData = new List<FunctionData>();
+                            functionsDataByName.Add(functionName, functionsData);
+                        }
+                        functionsData.Add(functionData);
+                    }
+                }
 
-            var functionStats =
-                groupedFunctionData
-                    .Select<IGrouping<string, FunctionData>, FunctionData>(AggregateFunction)
-                    .OrderByDescending(GetSelfTime)
-                    .ToArray();
-            return functionStats;
+                this.columnsToShow = columnsToShow;
+
+                var functionStats = new List<FunctionData>(functionsDataByName.Count);
+                foreach (var pair in functionsDataByName)
+                {
+                    var functionName = pair.Key;
+                    var functionsData = pair.Value;
+                    functionStats.Add(AggregateFunction(functionName, functionsData));
+                }
+                functionStats.Sort((x, y) => GetSelfTime(y).CompareTo(GetSelfTime(x)));
+
+                functionsDataByName.Clear();
+                profilerData.Clear();
+                return functionStats;
+            }
         }
 
-        private FunctionData AggregateFunction(IGrouping<string, FunctionData> functionGroup)
+        private FunctionData AggregateFunction(string functionName, IList<FunctionData> functionsData)
         {
             var function = new FunctionData { values = new FunctionDataValue[columnsToShow.Length] };
             function.values[0] = new FunctionDataValue
             {
                 column = "FunctionName",
-                value = functionGroup.Key
+                value = functionName
             };
-            var framesData = functionGroup.ToArray();
             for (var i = 1; i < columnsToShow.Length; ++i)
             {
                 var column = columnsToShow[i];
-                var functionDataValue = GetValue(framesData, column);
+                var functionDataValue = GetValue(functionsData, column);
                 function.values[i] = functionDataValue;
             }
             return function;
         }
 
-        private FunctionDataValue GetValue(FunctionData[] framesData, ProfilerColumn column)
+        private FunctionDataValue GetValue(IList<FunctionData> framesData, ProfilerColumn column)
         {
             var functionDataValue = new FunctionDataValue { column = ProfilerColumnNames[(int)column] };
             var getFunctionValue = getFunctionValues[(int)column];
+
+            for (int i = 0; i < framesData.Count; ++i)
+            {
+                values.Add(getFunctionValue(framesData[i]));
+            }
+
             if (column != ProfilerColumn.GCMemory)
             {
-                functionDataValue.value =
-                    AggregateValues(framesData.Select(getFunctionValue)).ToString("F2");
+                functionDataValue.value = AggregateValues(values).ToString("F2");
             }
             else
             {
-                functionDataValue.value =
-                    ByteSize.FromBytes(AggregateValues(framesData.Select(getFunctionValue)))
-                        .ToString();
+                functionDataValue.value = ByteSize.FromBytes(AggregateValues(values)).ToString();
             }
+
+            values.Clear();
             return functionDataValue;
         }
 
-        protected abstract float AggregateValues(IEnumerable<float> values);
+        protected abstract float AggregateValues(IList<float> values);
     }
 }

@@ -37,7 +37,7 @@ namespace ProfilerDataExporter
         private Type profilerWindowType;
         private FieldInfo currentFrameFieldInfo;
         private Vector2 scrollPosition;
-        private IAllocator<List<string>> listPool = new ObjectPool<List<string>>(new ListFactory<string>(ColumnsToShow.Length), 50);
+        private IAllocator<List<string>> listPool = new ListPool<string>(new ListFactory<string>(ColumnsToShow.Length), 50);
         private List<List<string>> functionStats = new List<List<string>>(50);
         private FunctionTableState functionStatsTableState;
         private StatsType statsType;
@@ -83,9 +83,12 @@ namespace ProfilerDataExporter
 
             if (calulateStatistics)
             {
-                var statsCalculator = StatsCalculatorProvider.GetStatsCalculator(statsType);
-                var stats = statsCalculator.CalculateStats(ColumnsToShow);
-                UpdateFunctionStats(stats);
+                using (Profiler.AddSample(Profiler.SamplerType.CalculateStatsTotal))
+                {
+                    var statsCalculator = StatsCalculatorProvider.GetStatsCalculator(statsType);
+                    var stats = statsCalculator.CalculateStats(ColumnsToShow);
+                    UpdateFunctionStats(stats);
+                }
             }
 
             if (functionStatsTableState == null)
@@ -105,29 +108,27 @@ namespace ProfilerDataExporter
             }
         }
 
-        private void UpdateFunctionStats(FunctionData[] stats)
+        private void UpdateFunctionStats(IList<FunctionData> stats)
         {
-            for (int i = 0; i < functionStats.Count; ++i)
+            using (Profiler.AddSample(Profiler.SamplerType.UpdateFunctionStats))
             {
-                var list = functionStats[i];
-                list.Clear();
-                listPool.Free(list);
-            }
-            functionStats.Clear();
+                listPool.Free(functionStats);
+                functionStats.Clear();
 
-            var statsLength = stats.Length;
-            var columnsToShowLength = ColumnsToShow.Length;
-            for (int i = 0; i < statsLength; ++i)
-            {
-                var stat = stats[i];
-                var functionStat = listPool.Allocate();
-                for (int j = 0; j < columnsToShowLength; ++j)
+                var statsLength = stats.Count;
+                var columnsToShowLength = ColumnsToShow.Length;
+                for (int i = 0; i < statsLength; ++i)
                 {
-                    var column = ColumnsToShow[j];
-                    var value = stat.GetValue(column);
-                    functionStat.Add(value);
+                    var stat = stats[i];
+                    var functionStat = listPool.Allocate();
+                    for (int j = 0; j < columnsToShowLength; ++j)
+                    {
+                        var column = ColumnsToShow[j];
+                        var value = stat.GetValue(column);
+                        functionStat.Add(value);
+                    }
+                    functionStats.Add(functionStat);
                 }
-                functionStats.Add(functionStat);
             }
         }
 
@@ -208,6 +209,7 @@ namespace ProfilerDataExporter
         {
             var profilerData = ProfilerData.GetProfilerData(firstFrameIndex, lastFrameIndex, selectedPropertyPath);
             File.WriteAllText(filePath, profilerData.ToString());
+            profilerData.Clear();
         }
     }
 

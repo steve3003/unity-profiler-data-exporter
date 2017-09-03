@@ -29,7 +29,8 @@ namespace ProfilerDataExporter
             return element;
         }
 
-        T IAllocator<T>.Allocate()
+        // IAllocator<T> implementation
+        public T Allocate()
         {
             if (freeElements.Count > 0)
             {
@@ -39,9 +40,20 @@ namespace ProfilerDataExporter
             return CreateElement();
         }
 
-        void IAllocator<T>.Free(T element)
+        // IAllocator<T> implementation
+        public virtual void Free(T element)
         {
             freeElements.Push(element);
+        }
+
+        // IAllocator<T> implementation
+        public void Free(IList<T> elements)
+        {
+            for (int i = 0; i < elements.Count; ++i)
+            {
+                var list = elements[i];
+                Free(list);
+            }
         }
     }
 }
