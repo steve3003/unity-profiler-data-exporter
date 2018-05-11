@@ -17,8 +17,8 @@ namespace ProfilerDataExporter
 
         public static ProfilerData GetProfilerData(int firstFrameIndex, int lastFrameIndex, string selectedPropertyPath = "")
         {
-            var profilerSortColumn = UnityEditorInternal.Profiling.ProfilerColumn.TotalTime;
-            var viewType = UnityEditorInternal.Profiling.ProfilerViewType.Hierarchy;
+            var profilerSortColumn = ProfilerColumn.TotalTime;
+            var viewType = ProfilerViewType.Hierarchy;
             var property = new ProfilerProperty();
 
             var profilerData = new ProfilerData();
@@ -62,12 +62,12 @@ namespace ProfilerDataExporter
     [Serializable]
     public class FunctionData
     {
-        private static readonly string[] ColumnNames = Enum.GetNames(typeof(UnityEditorInternal.Profiling.ProfilerColumn));
+        private static readonly string[] ColumnNames = Enum.GetNames(typeof(ProfilerColumn));
 
         public string functionPath;
         public FunctionDataValue[] values;
 
-        public string GetValue(UnityEditorInternal.Profiling.ProfilerColumn column)
+        public string GetValue(ProfilerColumn column)
         {
             var columnName = ColumnNames[(int)column];
             return FindDataValue(columnName).value;
@@ -95,14 +95,14 @@ namespace ProfilerDataExporter
         public static FunctionData Create(ProfilerProperty property)
         {
             var functionData = new FunctionData();
-            var columns = Enum.GetValues(typeof(UnityEditorInternal.Profiling.ProfilerColumn));
+            var columns = Enum.GetValues(typeof(ProfilerColumn));
             functionData.values = new FunctionDataValue[columns.Length];
             functionData.functionPath = property.propertyPath;
             for (int i = 0; i < columns.Length; ++i)
             {
-                var column = (UnityEditorInternal.Profiling.ProfilerColumn)columns.GetValue(i);
+                var column = (ProfilerColumn)columns.GetValue(i);
 #if UNITY_5_5_OR_NEWER
-                if (column == UnityEditorInternal.Profiling.ProfilerColumn.DontSort)
+                if (column == ProfilerColumn.DontSort)
                 {
                     continue;
                 }

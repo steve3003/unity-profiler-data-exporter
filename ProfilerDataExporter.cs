@@ -13,26 +13,26 @@ namespace ProfilerDataExporter
 {
     public class ProfilerDataExporter : EditorWindow
     {
-        private static readonly UnityEditorInternal.Profiling.ProfilerColumn[] ColumnsToShow = new UnityEditorInternal.Profiling.ProfilerColumn[]
+        private static readonly ProfilerColumn[] ColumnsToShow = new ProfilerColumn[]
         {
-            UnityEditorInternal.Profiling.ProfilerColumn.FunctionName,
-            UnityEditorInternal.Profiling.ProfilerColumn.TotalPercent,
-            UnityEditorInternal.Profiling.ProfilerColumn.SelfPercent,
-            UnityEditorInternal.Profiling.ProfilerColumn.Calls,
-            UnityEditorInternal.Profiling.ProfilerColumn.GCMemory,
-            UnityEditorInternal.Profiling.ProfilerColumn.TotalTime,
-            UnityEditorInternal.Profiling.ProfilerColumn.SelfTime,
+            ProfilerColumn.FunctionName,
+            ProfilerColumn.TotalPercent,
+            ProfilerColumn.SelfPercent,
+            ProfilerColumn.Calls,
+            ProfilerColumn.GCMemory,
+            ProfilerColumn.TotalTime,
+            ProfilerColumn.SelfTime,
         };
 
-        private static readonly Dictionary<UnityEditorInternal.Profiling.ProfilerColumn, string> ColumnHeaders = new Dictionary<UnityEditorInternal.Profiling.ProfilerColumn, string>
+        private static readonly Dictionary<ProfilerColumn, string> ColumnHeaders = new Dictionary<ProfilerColumn, string>
         {
-            { UnityEditorInternal.Profiling.ProfilerColumn.FunctionName, "Function"},
-            { UnityEditorInternal.Profiling.ProfilerColumn.TotalPercent, "Total"},
-            { UnityEditorInternal.Profiling.ProfilerColumn.SelfPercent, "Self"},
-            { UnityEditorInternal.Profiling.ProfilerColumn.Calls, "Calls"},
-            { UnityEditorInternal.Profiling.ProfilerColumn.GCMemory, "GC Alloc"},
-            { UnityEditorInternal.Profiling.ProfilerColumn.TotalTime, "Time ms"},
-            { UnityEditorInternal.Profiling.ProfilerColumn.SelfTime, "Self ms"},
+            { ProfilerColumn.FunctionName, "Function"},
+            { ProfilerColumn.TotalPercent, "Total"},
+            { ProfilerColumn.SelfPercent, "Self"},
+            { ProfilerColumn.Calls, "Calls"},
+            { ProfilerColumn.GCMemory, "GC Alloc"},
+            { ProfilerColumn.TotalTime, "Time ms"},
+            { ProfilerColumn.SelfTime, "Self ms"},
         };
 
         private string filePath = @"profiler_data.json";
@@ -86,7 +86,7 @@ namespace ProfilerDataExporter
             {
                 var statsCalculator = StatsCalculatorProvider.GetStatsCalculator(statsType);
                 var stats = statsCalculator.CalculateStats(ColumnsToShow);
-                functionStats = stats.Select<FunctionData, string[]>(f => ColumnsToShow.Select<UnityEditorInternal.Profiling.ProfilerColumn, string>(f.GetValue).ToArray()).ToArray();
+                functionStats = stats.Select<FunctionData, string[]>(f => ColumnsToShow.Select<ProfilerColumn, string>(f.GetValue).ToArray()).ToArray();
             }
 
             if (functionStatsTableState == null)
