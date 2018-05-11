@@ -8,16 +8,16 @@ namespace ProfilerDataExporter
 {
     public abstract class StatsCalculatorBase
     {
-        private static readonly ProfilerColumn[] ProfilerColumns = (ProfilerColumn[])Enum.GetValues(typeof(ProfilerColumn));
-        private static readonly string[] ProfilerColumnNames = Enum.GetNames(typeof(ProfilerColumn));
+        private static readonly UnityEditorInternal.Profiling.ProfilerColumn[] ProfilerColumns = (UnityEditorInternal.Profiling.ProfilerColumn[])Enum.GetValues(typeof(UnityEditorInternal.Profiling.ProfilerColumn));
+        private static readonly string[] ProfilerColumnNames = Enum.GetNames(typeof(UnityEditorInternal.Profiling.ProfilerColumn));
 
-        private static readonly Func<FunctionData, float> GetSelfTime = f => float.Parse(f.GetValue(ProfilerColumn.SelfTime));
+        private static readonly Func<FunctionData, float> GetSelfTime = f => float.Parse(f.GetValue(UnityEditorInternal.Profiling.ProfilerColumn.SelfTime));
         private static readonly Func<FrameData, IEnumerable<FunctionData>> GetFunctions = f => f.functions;
-        private static readonly Func<FunctionData, string> GetFunctionName = f => f.GetValue(ProfilerColumn.FunctionName);
+        private static readonly Func<FunctionData, string> GetFunctionName = f => f.GetValue(UnityEditorInternal.Profiling.ProfilerColumn.FunctionName);
 
         private static Func<FunctionData, float>[] getFunctionValues;
 
-        private ProfilerColumn[] columnsToShow;
+        private UnityEditorInternal.Profiling.ProfilerColumn[] columnsToShow;
 
         protected StatsCalculatorBase()
         {
@@ -27,7 +27,7 @@ namespace ProfilerDataExporter
                 for (var i = 0; i < ProfilerColumns.Length; ++i)
                 {
                     var column = ProfilerColumns[i];
-                    if (column != ProfilerColumn.GCMemory)
+                    if (column != UnityEditorInternal.Profiling.ProfilerColumn.GCMemory)
                     {
                         getFunctionValues[i] = f => float.Parse(f.GetValue(column).Replace("%", ""));
                     }
@@ -39,7 +39,7 @@ namespace ProfilerDataExporter
             }
         }
 
-        public FunctionData[] CalculateStats(ProfilerColumn[] columnsToShow)
+        public FunctionData[] CalculateStats(UnityEditorInternal.Profiling.ProfilerColumn[] columnsToShow)
         {
             var firstFrameIndex = ProfilerDriver.firstFrameIndex;
             var lastFrameIndex = ProfilerDriver.lastFrameIndex;
@@ -75,11 +75,11 @@ namespace ProfilerDataExporter
             return function;
         }
 
-        private FunctionDataValue GetValue(FunctionData[] framesData, ProfilerColumn column)
+        private FunctionDataValue GetValue(FunctionData[] framesData, UnityEditorInternal.Profiling.ProfilerColumn column)
         {
             var functionDataValue = new FunctionDataValue { column = ProfilerColumnNames[(int)column] };
             var getFunctionValue = getFunctionValues[(int)column];
-            if (column != ProfilerColumn.GCMemory)
+            if (column != UnityEditorInternal.Profiling.ProfilerColumn.GCMemory)
             {
                 functionDataValue.value =
                     AggregateValues(framesData.Select(getFunctionValue)).ToString("F2");

@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using UnityEditorInternal;
+
 using UnityEngine;
 
 namespace ProfilerDataExporter
@@ -9,7 +9,7 @@ namespace ProfilerDataExporter
         private SplitterState splitterState;
         private IEnumerable<string> columnHeaders;
 
-        public FunctionTableState(ProfilerColumn[] columnsToShow, Dictionary<ProfilerColumn, string> columnHeaders)
+        public FunctionTableState(UnityEditorInternal.Profiling.ProfilerColumn[] columnsToShow, Dictionary<UnityEditorInternal.Profiling.ProfilerColumn, string> columnHeaders)
         {
             this.columnHeaders = columnHeaders.Values;
             var splitterRelativeSizes = new float[columnsToShow.Length + 1];
@@ -22,7 +22,7 @@ namespace ProfilerDataExporter
             }
             splitterMinWidths[columnsToShow.Length] = 16;
             splitterRelativeSizes[columnsToShow.Length] = 0f;
-            if (columnsToShow[0] == ProfilerColumn.FunctionName)
+            if (columnsToShow[0] == UnityEditorInternal.Profiling.ProfilerColumn.FunctionName)
             {
                 splitterRelativeSizes[0] = 400f;
                 splitterMinWidths[0] = 100;
