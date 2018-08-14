@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Reflection;
 using UnityEngine;
 
@@ -9,23 +9,23 @@ namespace ProfilerDataExporter
     /// </summary>
     public class GUIClip
     {
-        private static readonly Type GuiClipType = typeof(GameObject).Assembly.GetType("UnityEngine.GUIClip");
-
-        private static readonly MethodInfo VisibleRectMethodInfo = GuiClipType.GetProperty(
-            "visibleRect",
-            BindingFlags.DeclaredOnly |
-            BindingFlags.Static |
-            BindingFlags.Public |
-            BindingFlags.GetProperty)
-            .GetGetMethod();
-
-        private static readonly Func<Rect> VisibleRectDelegate = (Func<Rect>)Delegate.CreateDelegate(typeof(Func<Rect>), VisibleRectMethodInfo);
-
         public static Rect visibleRect
         {
             get
             {
-                return VisibleRectDelegate();
+                Func<Rect> VisibleRect = null; 
+                var tyGUIClip = Type.GetType("UnityEngine.GUIClip,UnityEngine");
+                if (tyGUIClip != null)
+                {
+                    var piVisibleRect = tyGUIClip.GetProperty("visibleRect", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (piVisibleRect != null)
+                    {
+                        var getMethod = piVisibleRect.GetGetMethod(true) ?? piVisibleRect.GetGetMethod(false);
+                        VisibleRect = (Func<Rect>)Delegate.CreateDelegate(typeof(Func<Rect>), getMethod);
+                    }
+                }
+
+                return VisibleRect();
             }
         }
     }
