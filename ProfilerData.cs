@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEditorInternal;
+using UnityEditorInternal.Profiling;
 using UnityEngine;
 
 namespace ProfilerDataExporter
