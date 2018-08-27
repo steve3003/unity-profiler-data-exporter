@@ -1,32 +1,38 @@
-﻿using System;
+using System;
 using System.Reflection;
 using UnityEngine;
 
 namespace ProfilerDataExporter
 {
-    /// <summary>
-    /// Wrapper for unity internal GUIClip class
-    /// </summary>
-    public class GUIClip
-    {
-        private static readonly Type GuiClipType = typeof(GameObject).Assembly.GetType("UnityEngine.GUIClip");
+	/// <summary>
+	/// Wrapper for unity internal GUIClip class
+	/// </summary>
+	public class GUIClip
+	{
+		private static readonly Func<Rect> VisibleRectDelegate;
 
-        private static readonly MethodInfo VisibleRectMethodInfo = GuiClipType.GetProperty(
-            "visibleRect",
-            BindingFlags.DeclaredOnly |
-            BindingFlags.Static |
-            BindingFlags.Public |
-            BindingFlags.GetProperty)
-            .GetGetMethod();
+		static GUIClip()
+		{
+			var guiClipType = Type.GetType("UnityEngine.GUIClip,UnityEngine");
 
-        private static readonly Func<Rect> VisibleRectDelegate = (Func<Rect>)Delegate.CreateDelegate(typeof(Func<Rect>), VisibleRectMethodInfo);
+			var visibleRectMethodInfo = guiClipType.GetProperty(
+				"visibleRect",
+				BindingFlags.DeclaredOnly |
+				BindingFlags.Static |
+				BindingFlags.Public |
+				BindingFlags.NonPublic |
+				BindingFlags.GetProperty)
+				.GetGetMethod(true);
 
-        public static Rect visibleRect
-        {
-            get
-            {
-                return VisibleRectDelegate();
-            }
-        }
-    }
+			VisibleRectDelegate = (Func<Rect>)Delegate.CreateDelegate(typeof(Func<Rect>), visibleRectMethodInfo);
+		}
+
+		public static Rect visibleRect
+		{
+			get
+			{
+				return VisibleRectDelegate();
+			}
+		}
+	}
 }
