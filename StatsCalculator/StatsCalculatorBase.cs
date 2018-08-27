@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ByteSizeLib;
 using UnityEditorInternal;
+using UnityEditorInternal.Profiling;
 
 namespace ProfilerDataExporter
 {
