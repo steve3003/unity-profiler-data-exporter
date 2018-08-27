@@ -42,7 +42,7 @@ namespace ProfilerDataExporter
 
         public IList<FunctionData> CalculateStats(ProfilerColumn[] columnsToShow)
         {
-            using (Profiler.AddSample(Profiler.SamplerType.CalculateStats))
+            //using (Profiler.AddSample(Profiler.SamplerType.CalculateStats))
             {
                 var firstFrameIndex = ProfilerDriver.firstFrameIndex;
                 var lastFrameIndex = ProfilerDriver.lastFrameIndex;

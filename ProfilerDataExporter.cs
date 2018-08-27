@@ -84,7 +84,7 @@ namespace ProfilerDataExporter
 
             if (calulateStatistics)
             {
-                using (Profiler.AddSample(Profiler.SamplerType.CalculateStatsTotal))
+                //using (Profiler.AddSample(Profiler.SamplerType.CalculateStatsTotal))
                 {
                     var statsCalculator = StatsCalculatorProvider.GetStatsCalculator(statsType);
                     var stats = statsCalculator.CalculateStats(ColumnsToShow);
@@ -111,7 +111,7 @@ namespace ProfilerDataExporter
 
         private void UpdateFunctionStats(IList<FunctionData> stats)
         {
-            using (Profiler.AddSample(Profiler.SamplerType.UpdateFunctionStats))
+            //using (Profiler.AddSample(Profiler.SamplerType.UpdateFunctionStats))
             {
                 listPool.Free(functionStats);
                 functionStats.Clear();

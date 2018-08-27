@@ -21,7 +21,7 @@ namespace ProfilerDataExporter
 
         public static ProfilerData GetProfilerData(int firstFrameIndex, int lastFrameIndex, string selectedPropertyPath = "")
         {
-            using (Profiler.AddSample(Profiler.SamplerType.GetProfilerData))
+            //using (Profiler.AddSample(Profiler.SamplerType.GetProfilerData))
             {
                 var profilerSortColumn = ProfilerColumn.TotalTime;
                 var viewType = ProfilerViewType.Hierarchy;
