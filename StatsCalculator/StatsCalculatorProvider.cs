@@ -6,7 +6,18 @@ namespace ProfilerDataExporter
     {
         MaxValues,
         AverageValues,
-        MinValues
+        MinValues, 
+        SumValues, 
+    }
+
+    public enum SortType
+    {
+        TotalPercent,
+        SelfPercent,
+        Calls,
+        GCMemory,
+        TotalTime,
+        SelfTime,
     }
 
     public static class StatsCalculatorProvider
@@ -15,7 +26,8 @@ namespace ProfilerDataExporter
         {
             {StatsType.MaxValues,  new MaxStatsCalculator()},
             {StatsType.AverageValues,  new AvgStatsCalculator()},
-            {StatsType.MinValues,  new MinStatsCalculator()}
+            {StatsType.MinValues,  new MinStatsCalculator()}, 
+            {StatsType.SumValues,  new SumStatsCalculator()}, 
         };
 
         public static StatsCalculatorBase GetStatsCalculator(StatsType statsType)
