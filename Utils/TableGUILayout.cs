@@ -11,6 +11,7 @@ namespace ProfilerDataExporter
             SplitterState SplitterState { get; }
             IEnumerable<string> Headers { get; }
             Vector2 ScrollPosition { get; set; }
+            string SortHeader { get; set; }
         }
 
         private static GUIStyle evenRowStyle = GUI.skin.GetStyle("OL EntryBackEven");
@@ -18,16 +19,14 @@ namespace ProfilerDataExporter
         private static GUIStyle valueStyle = GUI.skin.GetStyle("OL Label");
         private static GUIStyle headerStyle = GUI.skin.GetStyle("OL title");
 
-        public static void BeginTable(ITableState tableState, string sortColName, GUIStyle style, params GUILayoutOption[] options)
+        public static void BeginTable(ITableState tableState, GUIStyle style, params GUILayoutOption[] options)
         {
             GUILayout.BeginHorizontal();
             SplitterGUILayout.BeginHorizontalSplit(tableState.SplitterState);
             foreach (var header in tableState.Headers)
             {
-                if (header == sortColName)
-                    GUILayout.Toggle(true, header, headerStyle);
-                else
-                    GUILayout.Toggle(false, header, headerStyle);
+                bool isSortHeader = header == tableState.SortHeader;
+                GUILayout.Toggle(isSortHeader, header, headerStyle);
             }
             SplitterGUILayout.EndHorizontalSplit();
             GUILayout.EndHorizontal();

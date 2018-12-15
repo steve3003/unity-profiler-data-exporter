@@ -10,6 +10,17 @@ using System.Diagnostics;
 
 namespace ProfilerDataExporter
 {
+    public enum SortType
+    {
+        FunctionName,
+        TotalPercent,
+        SelfPercent,
+        Calls,
+        GCMemory,
+        TotalTime,
+        SelfTime,
+    }
+
     public class ProfilerDataExporter : EditorWindow
     {
         private static readonly ProfilerColumn[] ColumnsToShow = new ProfilerColumn[]
@@ -26,12 +37,23 @@ namespace ProfilerDataExporter
         private static readonly Dictionary<ProfilerColumn, string> ColumnHeaders = new Dictionary<ProfilerColumn, string>
         {
             { ProfilerColumn.FunctionName, "Function"},
-            { ProfilerColumn.TotalPercent, "Total%"},
-            { ProfilerColumn.SelfPercent, "Self%"},
+            { ProfilerColumn.TotalPercent, "Total"},
+            { ProfilerColumn.SelfPercent, "Self"},
             { ProfilerColumn.Calls, "Calls"},
             { ProfilerColumn.GCMemory, "GC Alloc"},
             { ProfilerColumn.TotalTime, "Time ms"},
             { ProfilerColumn.SelfTime, "Self ms"},
+        };
+
+        private static readonly Dictionary<SortType, ProfilerColumn> SortTypeToProfilerColum = new Dictionary<SortType, ProfilerColumn>
+        {
+            { SortType.FunctionName, ProfilerColumn.FunctionName},
+            { SortType.TotalPercent, ProfilerColumn.TotalPercent},
+            { SortType.SelfPercent, ProfilerColumn.SelfPercent},
+            { SortType.Calls, ProfilerColumn.Calls},
+            { SortType.GCMemory, ProfilerColumn.GCMemory},
+            { SortType.TotalTime, ProfilerColumn.TotalTime},
+            { SortType.SelfTime, ProfilerColumn.SelfTime},
         };
 
         private string filePath = @"profiler_data.json";
@@ -40,10 +62,9 @@ namespace ProfilerDataExporter
         private Vector2 scrollPosition;
         private IAllocator<List<string>> listPool = new ListPool<string>(new ListFactory<string>(ColumnsToShow.Length), 50);
         private List<List<string>> functionStats = new List<List<string>>(50);
-        private StatsCalculatorBase mStatsCalculator;
-        private FunctionTableState functionStatsTableState;
+        private TableGUILayout.ITableState functionStatsTableState;
         private StatsType statsType;
-        private SortType mSortType = SortType.SelfTime;
+        private SortType sortType = SortType.SelfTime;
         private EditorWindow profilerWindow;
 
         [MenuItem("Window/Profiler Data Exporter")]
@@ -79,48 +100,47 @@ namespace ProfilerDataExporter
         private void DrawStats()
         {
             GUILayout.BeginHorizontal();
+
             GUILayout.Label("Statistics", EditorStyles.boldLabel, GUILayout.ExpandWidth(false));
             statsType = (StatsType)EditorGUILayout.EnumPopup(statsType, GUILayout.ExpandWidth(false));
             var calulateStatistics = GUILayout.Button("Calculate", GUILayout.ExpandWidth(false));
 
-            // sort
             GUILayout.Label("Sort By", EditorStyles.boldLabel, GUILayout.ExpandWidth(false));
-            var oldSortType = mSortType;
-            mSortType = (SortType)EditorGUILayout.EnumPopup(mSortType, GUILayout.ExpandWidth(false));
-            StatsCalculatorBase.SetSortType(mSortType);
-            bool needSort = oldSortType != mSortType;
+            var oldSortType = sortType;
+            sortType = (SortType)EditorGUILayout.EnumPopup(sortType, GUILayout.ExpandWidth(false));
+            bool sortTypeChanged = oldSortType != sortType;
+
             GUILayout.EndHorizontal();
 
-            if (calulateStatistics)
+            if (calulateStatistics || sortTypeChanged)
             {
                 //using (Profiler.AddSample(Profiler.SamplerType.CalculateStatsTotal))
                 {
-                    mStatsCalculator = StatsCalculatorProvider.GetStatsCalculator(statsType);
-                    var stats = mStatsCalculator.CalculateStats(ColumnsToShow);
+                    var statsCalculator = StatsCalculatorProvider.GetStatsCalculator(statsType);
+                    var sortColumn = SortTypeToProfilerColum[sortType];
+                    var stats = statsCalculator.CalculateStats(ColumnsToShow, sortColumn);
                     UpdateFunctionStats(stats);
                 }
-            }
-            else if (needSort && mStatsCalculator != null)
-            {
-                var stats = mStatsCalculator.CalculateStats(ColumnsToShow);
-                UpdateFunctionStats(stats);
             }
 
             if (functionStatsTableState == null)
             {
-                functionStatsTableState = new FunctionTableState(ColumnsToShow, ColumnHeaders);
+                var sortHeader = ColumnHeaders[SortTypeToProfilerColum[sortType]];
+                functionStatsTableState = new FunctionTableState(ColumnsToShow, ColumnHeaders, sortHeader);
             }
 
-            TableGUILayout.BeginTable(functionStatsTableState, ColumnHeaders[StatsCalculatorBase.sSortCollum], GUI.skin.GetStyle("OL Box"), GUILayout.MinHeight(100f), GUILayout.MaxHeight(500f));
-            if (functionStats != null)
+            if (sortTypeChanged)
             {
-                for (var i = 0; i < functionStats.Count; ++i)
-                {
-                    var functionData = functionStats[i];
-                    TableGUILayout.AddRow(functionStatsTableState, i, functionData);
-                }
-                TableGUILayout.EndTable();
+                functionStatsTableState.SortHeader = ColumnHeaders[SortTypeToProfilerColum[sortType]];
             }
+
+            TableGUILayout.BeginTable(functionStatsTableState, GUI.skin.GetStyle("OL Box"), GUILayout.MinHeight(100f), GUILayout.MaxHeight(500f));
+            for (var i = 0; i < functionStats.Count; ++i)
+            {
+                var functionData = functionStats[i];
+                TableGUILayout.AddRow(functionStatsTableState, i, functionData);
+            }
+            TableGUILayout.EndTable();
         }
 
         private void UpdateFunctionStats(IList<FunctionData> stats)

@@ -10,16 +10,6 @@ namespace ProfilerDataExporter
         SumValues, 
     }
 
-    public enum SortType
-    {
-        TotalPercent,
-        SelfPercent,
-        Calls,
-        GCMemory,
-        TotalTime,
-        SelfTime,
-    }
-
     public static class StatsCalculatorProvider
     {
         private static readonly Dictionary<StatsType, StatsCalculatorBase> Calculators = new Dictionary<StatsType, StatsCalculatorBase>()

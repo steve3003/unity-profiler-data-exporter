@@ -8,10 +8,12 @@ namespace ProfilerDataExporter
     {
         private SplitterState splitterState;
         private IEnumerable<string> columnHeaders;
+        private string sortHeader;
 
-        public FunctionTableState(ProfilerColumn[] columnsToShow, Dictionary<ProfilerColumn, string> columnHeaders)
+        public FunctionTableState(ProfilerColumn[] columnsToShow, Dictionary<ProfilerColumn, string> columnHeaders, string sortHeader)
         {
             this.columnHeaders = columnHeaders.Values;
+            this.sortHeader = sortHeader;
             var splitterRelativeSizes = new float[columnsToShow.Length + 1];
             var splitterMinWidths = new int[columnsToShow.Length + 1];
             for (int i = 0; i < columnsToShow.Length; i++)
@@ -49,6 +51,19 @@ namespace ProfilerDataExporter
             get
             {
                 return splitterState;
+            }
+        }
+
+        string TableGUILayout.ITableState.SortHeader
+        {
+            get
+            {
+                return sortHeader;
+            }
+
+            set
+            {
+                sortHeader = value;
             }
         }
     }

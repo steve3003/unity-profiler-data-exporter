@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using ByteSizeLib;
 using UnityEditorInternal;
 using UnityEditorInternal.Profiling;
 
@@ -10,34 +9,13 @@ namespace ProfilerDataExporter
     {
         private static readonly ProfilerColumn[] ProfilerColumns = (ProfilerColumn[])Enum.GetValues(typeof(ProfilerColumn));
         private static readonly string[] ProfilerColumnNames = Enum.GetNames(typeof(ProfilerColumn));
-
-        public static ProfilerColumn sSortCollum = ProfilerColumn.SelfTime;
-        // return sort value according to column
-        private static readonly Func<FunctionData, float> GetSortValue = f => {
-            string str = f.GetValue(sSortCollum);
-
-            // unify gc value
-            int factor = 1;
-            if (sSortCollum == ProfilerColumn.GCMemory)
-            {
-                int spaceIndex = str.IndexOf(' ');
-                if (str[spaceIndex + 1] == 'K')
-                    factor = 1024;
-                else if (str[spaceIndex + 1] == 'M')
-                    factor = 1024 * 1024;
-
-                str = str.Substring(0, spaceIndex);
-            }
-            return float.Parse(str) * factor;
-        };
-
-
         private static Func<FunctionData, float>[] getFunctionValues;
 
         private ProfilerColumn[] columnsToShow;
 
         private List<float> values = new List<float>();
         private Dictionary<string, List<FunctionData>> functionsDataByName = new Dictionary<string, List<FunctionData>>();
+        private ProfilerColumn sortColumn;
 
         protected StatsCalculatorBase()
         {
@@ -59,7 +37,7 @@ namespace ProfilerDataExporter
             }
         }
 
-        public IList<FunctionData> CalculateStats(ProfilerColumn[] columnsToShow)
+        public IList<FunctionData> CalculateStats(ProfilerColumn[] columnsToShow, ProfilerColumn sortColumn)
         {
             //using (Profiler.AddSample(Profiler.SamplerType.CalculateStats))
             {
@@ -95,7 +73,9 @@ namespace ProfilerDataExporter
                     var functionsData = pair.Value;
                     functionStats.Add(AggregateFunction(functionName, functionsData));
                 }
-                functionStats.Sort((x, y) => GetSortValue(y).CompareTo(GetSortValue(x)));
+
+                this.sortColumn = sortColumn;
+                functionStats.Sort(FunctionStatsSorter);
 
                 functionsDataByName.Clear();
                 profilerData.Clear();
@@ -103,29 +83,15 @@ namespace ProfilerDataExporter
             }
         }
 
-        public static void SetSortType(SortType sortType)
+        private int FunctionStatsSorter(FunctionData x, FunctionData y)
         {
-            switch (sortType)
+            if (sortColumn != ProfilerColumn.FunctionName)
             {
-                case SortType.TotalPercent:
-                    sSortCollum = ProfilerColumn.TotalPercent;
-                    break;
-                case SortType.SelfPercent:
-                    sSortCollum = ProfilerColumn.SelfPercent;
-                    break;
-                case SortType.Calls:
-                    sSortCollum = ProfilerColumn.Calls;
-                    break;
-                case SortType.GCMemory:
-                    sSortCollum = ProfilerColumn.GCMemory;
-                    break;
-                case SortType.TotalTime:
-                    sSortCollum = ProfilerColumn.TotalTime;
-                    break;
-                case SortType.SelfTime:
-                    sSortCollum = ProfilerColumn.SelfTime;
-                    break;
+                var getFunctionValue = getFunctionValues[(int)sortColumn];
+                return getFunctionValue(y).CompareTo(getFunctionValue(x));
             }
+
+            return y.GetValue(sortColumn).CompareTo(x.GetValue(sortColumn));
         }
 
         private FunctionData AggregateFunction(string functionName, IList<FunctionData> functionsData)
