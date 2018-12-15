@@ -11,7 +11,26 @@ namespace ProfilerDataExporter
         private static readonly ProfilerColumn[] ProfilerColumns = (ProfilerColumn[])Enum.GetValues(typeof(ProfilerColumn));
         private static readonly string[] ProfilerColumnNames = Enum.GetNames(typeof(ProfilerColumn));
 
-        private static readonly Func<FunctionData, float> GetSelfTime = f => float.Parse(f.GetValue(ProfilerColumn.SelfTime));
+        public static ProfilerColumn sSortCollum = ProfilerColumn.SelfTime;
+        // return sort value according to column
+        private static readonly Func<FunctionData, float> GetSortValue = f => {
+            string str = f.GetValue(sSortCollum);
+
+            // unify gc value
+            int factor = 1;
+            if (sSortCollum == ProfilerColumn.GCMemory)
+            {
+                int spaceIndex = str.IndexOf(' ');
+                if (str[spaceIndex + 1] == 'K')
+                    factor = 1024;
+                else if (str[spaceIndex + 1] == 'M')
+                    factor = 1024 * 1024;
+
+                str = str.Substring(0, spaceIndex);
+            }
+            return float.Parse(str) * factor;
+        };
+
 
         private static Func<FunctionData, float>[] getFunctionValues;
 
@@ -76,11 +95,36 @@ namespace ProfilerDataExporter
                     var functionsData = pair.Value;
                     functionStats.Add(AggregateFunction(functionName, functionsData));
                 }
-                functionStats.Sort((x, y) => GetSelfTime(y).CompareTo(GetSelfTime(x)));
+                functionStats.Sort((x, y) => GetSortValue(y).CompareTo(GetSortValue(x)));
 
                 functionsDataByName.Clear();
                 profilerData.Clear();
                 return functionStats;
+            }
+        }
+
+        public static void SetSortType(SortType sortType)
+        {
+            switch (sortType)
+            {
+                case SortType.TotalPercent:
+                    sSortCollum = ProfilerColumn.TotalPercent;
+                    break;
+                case SortType.SelfPercent:
+                    sSortCollum = ProfilerColumn.SelfPercent;
+                    break;
+                case SortType.Calls:
+                    sSortCollum = ProfilerColumn.Calls;
+                    break;
+                case SortType.GCMemory:
+                    sSortCollum = ProfilerColumn.GCMemory;
+                    break;
+                case SortType.TotalTime:
+                    sSortCollum = ProfilerColumn.TotalTime;
+                    break;
+                case SortType.SelfTime:
+                    sSortCollum = ProfilerColumn.SelfTime;
+                    break;
             }
         }
 
