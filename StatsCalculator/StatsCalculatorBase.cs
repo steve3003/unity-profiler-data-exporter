@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEditorInternal;
 using UnityEditorInternal.Profiling;
+using ByteSizeLib;
 
 namespace ProfilerDataExporter
 {
