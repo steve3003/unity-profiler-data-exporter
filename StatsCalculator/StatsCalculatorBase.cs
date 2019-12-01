@@ -8,21 +8,6 @@ using ByteSizeLib;
 
 namespace ProfilerDataExporter
 {
-
-#if UNITY_2019_1_OR_NEWER
-    public enum ProfilerColumn
-    {
-        FunctionName = 0,
-        TotalPercent = 1,
-        SelfPercent = 2,
-        Calls = 3,
-        GCMemory = 4,
-        TotalTime = 5,
-        SelfTime = 6,
-        DontSort = -1,
-    }
-#endif
-
     public abstract class StatsCalculatorBase
     {
         private static readonly ProfilerColumn[] ProfilerColumns = (ProfilerColumn[])Enum.GetValues(typeof(ProfilerColumn));

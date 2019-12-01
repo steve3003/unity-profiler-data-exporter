@@ -8,14 +8,6 @@ using UnityEngine;
 
 namespace ProfilerDataExporter
 {
-
-#if UNITY_2019_1_OR_NEWER
-    public enum ProfilerViewType
-    {
-        Hierarchy = 0
-    }
-#endif
-
     [Serializable]
     public class ProfilerData
     {

@@ -12,6 +12,25 @@ using System.Diagnostics;
 
 namespace ProfilerDataExporter
 {
+#if UNITY_2019_1_OR_NEWER
+    public enum ProfilerColumn
+    {
+        FunctionName = 0,
+        TotalPercent = 1,
+        SelfPercent = 2,
+        Calls = 3,
+        GCMemory = 4,
+        TotalTime = 5,
+        SelfTime = 6,
+        DontSort = -1,
+    }
+
+    public enum ProfilerViewType
+    {
+        Hierarchy = 0
+    }
+#endif
+
     public enum SortType
     {
         FunctionName,
