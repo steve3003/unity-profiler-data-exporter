@@ -1,7 +1,9 @@
 ﻿using UnityEngine;
 using UnityEditor;
 using UnityEditorInternal;
+#if !UNITY_2019_1_OR_NEWER
 using UnityEditorInternal.Profiling;
+#endif
 using System;
 using System.Collections.Generic;
 using System.Reflection;

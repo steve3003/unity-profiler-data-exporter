@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
+#if !UNITY_2019_1_OR_NEWER
 using UnityEditorInternal.Profiling;
+#endif
 using UnityEngine;
 
 namespace ProfilerDataExporter

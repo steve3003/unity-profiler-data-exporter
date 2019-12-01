@@ -1,11 +1,21 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEditorInternal;
+#if !UNITY_2019_1_OR_NEWER
 using UnityEditorInternal.Profiling;
+#endif
 using UnityEngine;
 
 namespace ProfilerDataExporter
 {
+
+#if UNITY_2019_1_OR_NEWER
+    public enum ProfilerViewType
+    {
+        Hierarchy = 0
+    }
+#endif
+
     [Serializable]
     public class ProfilerData
     {
@@ -30,7 +40,11 @@ namespace ProfilerDataExporter
                 var profilerData = profilerDataAllocator.Allocate();
                 for (int frameIndex = firstFrameIndex; frameIndex <= lastFrameIndex; ++frameIndex)
                 {
+#if UNITY_2019_1_OR_NEWER
+                    profilerProperty.SetRoot(frameIndex, (int)profilerSortColumn, (int)viewType);
+#else
                     profilerProperty.SetRoot(frameIndex, profilerSortColumn, viewType);
+#endif
                     profilerProperty.onlyShowGPUSamples = false;
 
                     var frameData = FrameData.Create();
@@ -158,7 +172,12 @@ namespace ProfilerDataExporter
 #endif
                 var functionDataValue = FunctionDataValue.Create();
                 functionDataValue.column = columnNames[i];
+#if UNITY_2019_1_OR_NEWER
+                functionDataValue.value = property.GetColumn((int)column);
+#else
                 functionDataValue.value = property.GetColumn(column);
+#endif
+
                 functionData.values[i] = functionDataValue;
             }
             return functionData;
