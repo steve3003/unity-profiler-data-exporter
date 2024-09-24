@@ -28,7 +28,7 @@ namespace ProfilerDataExporter
             BindingFlags.DeclaredOnly |
             BindingFlags.Public | BindingFlags.NonPublic |
             BindingFlags.Instance | BindingFlags.CreateInstance, null, null, new object[] { relativeSizes, minSizes, maxSizes });
-            realSizes = (int[])RealSizesInfo.GetValue(splitter);
+            realSizes = Array.ConvertAll((float[])RealSizesInfo.GetValue(splitter), x => (int)x);
         }
 
         public SplitterState(object splitter)
@@ -69,10 +69,19 @@ namespace ProfilerDataExporter
         {
             get
             {
-                return (int)SplitterStateType.InvokeMember("splitSize",
+                var splitSize = SplitterStateType.InvokeMember("splitSize",
                     BindingFlags.DeclaredOnly |
                     BindingFlags.Public | BindingFlags.NonPublic |
                     BindingFlags.Instance | BindingFlags.GetField, null, splitter, null);
+                    
+                if (splitSize is int)
+                {
+                    return (int)splitSize;
+                }
+                else
+                {
+                    return 0;
+                }
             }
         }
         public float[] relativeSizes
