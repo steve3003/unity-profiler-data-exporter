@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿#if UNITY_EDITOR
+using UnityEngine;
 using UnityEditor;
 using UnityEditorInternal;
 #if !UNITY_2019_1_OR_NEWER
@@ -268,5 +269,5 @@ namespace ProfilerDataExporter
             profilerData.Clear();
         }
     }
-
-}
+}   
+#endif  

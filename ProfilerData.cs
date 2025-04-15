@@ -1,4 +1,5 @@
-﻿using System;
+﻿#if UNITY_EDITOR
+using System;
 using System.Collections.Generic;
 using UnityEditorInternal;
 #if !UNITY_2019_1_OR_NEWER
@@ -197,3 +198,4 @@ namespace ProfilerDataExporter
         }
     }
 }
+#endif
