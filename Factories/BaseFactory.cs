@@ -1,4 +1,5 @@
-﻿namespace ProfilerDataExporter
+﻿#if UNITY_EDITOR
+namespace ProfilerDataExporter
 {
     public class BaseFactory<T> : IFactory<T>
         where T : new()
@@ -10,4 +11,4 @@
         }
     }
 }
-
+#endif
