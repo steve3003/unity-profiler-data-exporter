@@ -1,5 +1,4 @@
-﻿#if UNITY_EDITOR
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEditor;
 using UnityEditorInternal;
 #if !UNITY_2019_1_OR_NEWER
@@ -7,7 +6,6 @@ using UnityEditorInternal.Profiling;
 #endif
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.IO;
 using System.Diagnostics;
 
@@ -79,15 +77,13 @@ namespace ProfilerDataExporter
         };
 
         private string filePath = @"profiler_data.json";
-        private Type profilerWindowType;
-        private FieldInfo currentFrameFieldInfo;
         private Vector2 scrollPosition;
         private IAllocator<List<string>> listPool = new ListPool<string>(new ListFactory<string>(ColumnsToShow.Length), 50);
         private List<List<string>> functionStats = new List<List<string>>(50);
         private TableGUILayout.ITableState functionStatsTableState;
         private StatsType statsType;
         private SortType sortType = SortType.SelfTime;
-        private EditorWindow profilerWindow;
+        private ProfilerWindow profilerWindow;
 
         [MenuItem("Window/Profiler Data Exporter")]
         private static void Init()
@@ -96,18 +92,11 @@ namespace ProfilerDataExporter
             window.Show();
         }
 
-        private void OnEnable()
-        {
-            Assembly assem = typeof(Editor).Assembly;
-            profilerWindowType = assem.GetType("UnityEditor.ProfilerWindow");
-            currentFrameFieldInfo = profilerWindowType.GetField("m_CurrentFrame", BindingFlags.NonPublic | BindingFlags.Instance);
-        }
-
         private void OnGUI()
         {
             if (!profilerWindow)
             {
-                profilerWindow = GetWindow(profilerWindowType);
+                profilerWindow = GetWindow<ProfilerWindow>();
             }
 
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
@@ -198,11 +187,14 @@ namespace ProfilerDataExporter
             {
                 ExportProfilerData();
             }
-            var currentframe = (int)currentFrameFieldInfo.GetValue(profilerWindow);
-            GUI.enabled = currentframe > 0;
+            // The frame selected in the Profiler window, or the last recorded one if there is no selection.
+            var currentFrame = profilerWindow != null ? (int)profilerWindow.selectedFrameIndex : -1;
+            if (currentFrame < 0)
+                currentFrame = ProfilerDriver.lastFrameIndex;
+            GUI.enabled = currentFrame >= 0;
             if (GUILayout.Button("Current Frame Data"))
             {
-                ExportCurrentFrameData(currentframe);
+                ExportCurrentFrameData(currentFrame);
             }
             GUI.enabled = true;
             GUI.enabled = !string.IsNullOrEmpty(ProfilerDriver.selectedPropertyPath);
@@ -266,8 +258,10 @@ namespace ProfilerDataExporter
         {
             var profilerData = ProfilerData.GetProfilerData(firstFrameIndex, lastFrameIndex, selectedPropertyPath);
             File.WriteAllText(filePath, profilerData.ToString());
+            // Fully qualified: System.Diagnostics is imported for Process, so bare Debug is ambiguous.
+            UnityEngine.Debug.Log($"[ProfilerDataExporter] Exported {profilerData.frames.Count} frame(s) to {Path.GetFullPath(filePath)}");
             profilerData.Clear();
         }
     }
-}   
-#endif  
+
+}

@@ -1,5 +1,4 @@
-﻿#if UNITY_EDITOR
-using System;
+﻿using System;
 using System.Globalization;
 
 namespace ByteSizeLib
@@ -408,4 +407,3 @@ namespace ByteSizeLib
         }
     }
 }
-#endif

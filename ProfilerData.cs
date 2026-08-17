@@ -1,11 +1,9 @@
-﻿#if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using UnityEditor.Profiling;
 using UnityEditorInternal;
-#if !UNITY_2019_1_OR_NEWER
-using UnityEditorInternal.Profiling;
-#endif
 using UnityEngine;
+using ByteSizeLib;
 
 namespace ProfilerDataExporter
 {
@@ -14,59 +12,57 @@ namespace ProfilerDataExporter
     {
         public List<FrameData> frames = new List<FrameData>(300);
 
-        public override string ToString()
-        {
-            return JsonUtility.ToJson(this);
-        }
+        public override string ToString() => JsonUtility.ToJson(this);
 
-        private static IAllocator<ProfilerData> profilerDataAllocator = new ObjectPool<ProfilerData>(new BaseFactory<ProfilerData>(), 1);
-        private static ProfilerProperty profilerProperty = new ProfilerProperty();
+        private static IAllocator<ProfilerData> profilerDataAllocator =
+            new ObjectPool<ProfilerData>(new BaseFactory<ProfilerData>(), 1);
 
         public static ProfilerData GetProfilerData(int firstFrameIndex, int lastFrameIndex, string selectedPropertyPath = "")
         {
-            //using (Profiler.AddSample(Profiler.SamplerType.GetProfilerData))
-            {
-                var profilerSortColumn = ProfilerColumn.TotalTime;
-                var viewType = ProfilerViewType.Hierarchy;
-                profilerProperty.Cleanup();
+            var profilerData = profilerDataAllocator.Allocate();
 
-                var profilerData = profilerDataAllocator.Allocate();
-                for (int frameIndex = firstFrameIndex; frameIndex <= lastFrameIndex; ++frameIndex)
+            for (int frameIndex = firstFrameIndex; frameIndex <= lastFrameIndex; ++frameIndex)
+            {
+                using (var view = ProfilerDriver.GetHierarchyFrameDataView(
+                           frameIndex,
+                           0,
+                           HierarchyFrameDataView.ViewModes.Default,
+                           HierarchyFrameDataView.columnTotalTime,
+                           false))
                 {
-#if UNITY_2019_1_OR_NEWER
-                    profilerProperty.SetRoot(frameIndex, (int)profilerSortColumn, (int)viewType);
-#else
-                    profilerProperty.SetRoot(frameIndex, profilerSortColumn, viewType);
-#endif
-                    profilerProperty.onlyShowGPUSamples = false;
+                    if (view == null || !view.valid) continue;
 
                     var frameData = FrameData.Create();
-                    const bool enterChildren = true;
-                    while (profilerProperty.Next(enterChildren))
-                    {
-                        bool shouldSaveProperty = string.IsNullOrEmpty(selectedPropertyPath) || profilerProperty.propertyPath == selectedPropertyPath;
-                        if (shouldSaveProperty)
-                        {
-                            var functionData = FunctionData.Create(profilerProperty);
-                            frameData.functions.Add(functionData);
-                            //Debug.Log(functionData.ToString());
-                        }
-                    }
-                    profilerProperty.Cleanup();
+                    var itemIds = new List<int>();
+                    var rootId = view.GetRootItemID();
+                    CollectItems(view, rootId, rootId, itemIds, selectedPropertyPath);
+
+                    for (int i = 0; i < itemIds.Count; ++i)
+                        frameData.functions.Add(FunctionData.Create(view, itemIds[i]));
+
                     profilerData.frames.Add(frameData);
-                    //Debug.Log(frameData.ToString());
                 }
-                //Debug.Log(profilerData.ToString());
-                return profilerData;
             }
+            return profilerData;
+        }
+
+        private static void CollectItems(HierarchyFrameDataView view, int rootId, int itemId, List<int> result, string pathFilter)
+        {
+            if (itemId != rootId)
+            {
+                var path = view.GetItemPath(itemId);
+                if (string.IsNullOrEmpty(pathFilter) || path == pathFilter)
+                    result.Add(itemId);
+            }
+            var children = new List<int>();
+            view.GetItemChildren(itemId, children);
+            for (int i = 0; i < children.Count; ++i)
+                CollectItems(view, rootId, children[i], result, pathFilter);
         }
 
         public void Clear()
         {
-            for (int i = 0; i < frames.Count; ++i)
-            {
-                frames[i].Clear();
-            }
+            for (int i = 0; i < frames.Count; ++i) frames[i].Clear();
             frames.Clear();
             profilerDataAllocator.Free(this);
         }
@@ -77,103 +73,84 @@ namespace ProfilerDataExporter
     {
         public List<FunctionData> functions = new List<FunctionData>(50);
 
-        private static IAllocator<FrameData> frameDataAllocator = new ObjectPool<FrameData>(new BaseFactory<FrameData>(), 300);
+        private static IAllocator<FrameData> frameDataAllocator =
+            new ObjectPool<FrameData>(new BaseFactory<FrameData>(), 300);
 
-        public static FrameData Create()
-        {
-            return frameDataAllocator.Allocate();
-        }
+        public static FrameData Create() => frameDataAllocator.Allocate();
 
         public void Clear()
         {
-            for (int i = 0; i < functions.Count; ++i)
-            {
-                functions[i].Clear();
-            }
+            for (int i = 0; i < functions.Count; ++i) functions[i].Clear();
             functions.Clear();
             frameDataAllocator.Free(this);
         }
 
-        public override string ToString()
-        {
-            return JsonUtility.ToJson(this);
-        }
+        public override string ToString() => JsonUtility.ToJson(this);
     }
 
     [Serializable]
     public class FunctionData
     {
-        private static readonly string[] columnNames = Enum.GetNames(typeof(ProfilerColumn));
-        private static readonly ProfilerColumn[] columns = (ProfilerColumn[])Enum.GetValues(typeof(ProfilerColumn));
+        private static readonly string[]         columnNames = Enum.GetNames(typeof(ProfilerColumn));
+        private static readonly ProfilerColumn[] columns     = (ProfilerColumn[])Enum.GetValues(typeof(ProfilerColumn));
 
-        private static IAllocator<FunctionData> functionDataAllocator = new ObjectPool<FunctionData>(new BaseFactory<FunctionData>(), 300 * 50);
+        private static IAllocator<FunctionData> functionDataAllocator =
+            new ObjectPool<FunctionData>(new BaseFactory<FunctionData>(), 300 * 50);
 
-        public string functionPath;
+        public string             functionPath;
         public FunctionDataValue[] values = new FunctionDataValue[columnNames.Length];
 
         public string GetValue(ProfilerColumn column)
-        {
-            var columnName = columnNames[(int)column];
-            return FindDataValue(columnName).value;
-        }
+            => FindDataValue(columnNames[(int)column]).value;
 
-        private FunctionDataValue FindDataValue(string columnName)
+        private FunctionDataValue FindDataValue(string name)
         {
-            int length = values.Length;
-            for (int i = 0; i < length; ++i)
-            {
-                var value = values[i];
-                if (value.column == columnName)
-                {
-                    return value;
-                }
-            }
+            for (int i = 0; i < values.Length; ++i)
+                if (values[i] != null && values[i].column == name) return values[i];
             return default(FunctionDataValue);
         }
 
-        public override string ToString()
-        {
-            return JsonUtility.ToJson(this);
-        }
+        public override string ToString() => JsonUtility.ToJson(this);
 
         public void Clear()
         {
-            for (int i = 0; i < values.Length; ++i)
-            {
-                var functionDataValue = values[i];
-                if (functionDataValue != null)
-                {
-                    functionDataValue.Clear();
-                }
-            }
+            for (int i = 0; i < values.Length; ++i) if (values[i] != null) values[i].Clear();
             functionPath = string.Empty;
             functionDataAllocator.Free(this);
         }
 
-        public static FunctionData Create(ProfilerProperty property)
+        public static FunctionData Create(HierarchyFrameDataView view, int itemId)
         {
-            var functionData = functionDataAllocator.Allocate();
-            functionData.functionPath = property.propertyPath;
+            var fd = functionDataAllocator.Allocate();
+            fd.functionPath = view.GetItemPath(itemId);
+
             for (int i = 0; i < columns.Length; ++i)
             {
-                var column = columns[i];
-#if UNITY_5_5_OR_NEWER
-                if (column == ProfilerColumn.DontSort)
-                {
-                    continue;
-                }
-#endif
-                var functionDataValue = FunctionDataValue.Create();
-                functionDataValue.column = columnNames[i];
-#if UNITY_2019_1_OR_NEWER
-                functionDataValue.value = property.GetColumn((int)column);
-#else
-                functionDataValue.value = property.GetColumn(column);
-#endif
+                var col = columns[i];
+                if (col == ProfilerColumn.DontSort) continue;
 
-                functionData.values[i] = functionDataValue;
+                var fdv = FunctionDataValue.Create();
+                fdv.column = columnNames[i];
+                switch (col)
+                {
+                    case ProfilerColumn.FunctionName:
+                        fdv.value = view.GetItemName(itemId); break;
+                    case ProfilerColumn.GCMemory:
+                        fdv.value = ByteSize.FromBytes(view.GetItemColumnDataAsSingle(itemId, HierarchyFrameDataView.columnGcMemory)).ToString(); break;
+                    case ProfilerColumn.TotalPercent:
+                        fdv.value = view.GetItemColumnDataAsSingle(itemId, HierarchyFrameDataView.columnTotalPercent).ToString("F2") + "%"; break;
+                    case ProfilerColumn.SelfPercent:
+                        fdv.value = view.GetItemColumnDataAsSingle(itemId, HierarchyFrameDataView.columnSelfPercent).ToString("F2") + "%"; break;
+                    case ProfilerColumn.Calls:
+                        fdv.value = ((int)view.GetItemColumnDataAsSingle(itemId, HierarchyFrameDataView.columnCalls)).ToString(); break;
+                    case ProfilerColumn.TotalTime:
+                        fdv.value = view.GetItemColumnDataAsSingle(itemId, HierarchyFrameDataView.columnTotalTime).ToString("F2"); break;
+                    case ProfilerColumn.SelfTime:
+                        fdv.value = view.GetItemColumnDataAsSingle(itemId, HierarchyFrameDataView.columnSelfTime).ToString("F2"); break;
+                }
+                fd.values[i] = fdv;
             }
-            return functionData;
+            return fd;
         }
     }
 
@@ -183,19 +160,18 @@ namespace ProfilerDataExporter
         public string column;
         public string value;
 
-        private static IAllocator<FunctionDataValue> functionDataValueAllocator = new ObjectPool<FunctionDataValue>(new BaseFactory<FunctionDataValue>(), 300 * 50 * Enum.GetValues(typeof(ProfilerColumn)).Length);
+        private static IAllocator<FunctionDataValue> functionDataValueAllocator =
+            new ObjectPool<FunctionDataValue>(
+                new BaseFactory<FunctionDataValue>(),
+                300 * 50 * Enum.GetValues(typeof(ProfilerColumn)).Length);
 
-        public static FunctionDataValue Create()
-        {
-            return functionDataValueAllocator.Allocate();
-        }
+        public static FunctionDataValue Create() => functionDataValueAllocator.Allocate();
 
         public void Clear()
         {
             functionDataValueAllocator.Free(this);
             column = string.Empty;
-            value = string.Empty;
+            value  = string.Empty;
         }
     }
 }
-#endif
