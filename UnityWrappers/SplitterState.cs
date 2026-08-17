@@ -1,5 +1,4 @@
-﻿#if UNITY_EDITOR
-using System;
+﻿using System;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
@@ -74,15 +73,7 @@ namespace ProfilerDataExporter
                     BindingFlags.DeclaredOnly |
                     BindingFlags.Public | BindingFlags.NonPublic |
                     BindingFlags.Instance | BindingFlags.GetField, null, splitter, null);
-                    
-                if (splitSize is int)
-                {
-                    return (int)splitSize;
-                }
-                else
-                {
-                    return 0;
-                }
+                return splitSize is int intValue ? intValue : 0;
             }
         }
         public float[] relativeSizes
@@ -145,4 +136,3 @@ namespace ProfilerDataExporter
         }
     }
 }
-#endif

@@ -1,5 +1,4 @@
-﻿#if UNITY_EDITOR
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace ProfilerDataExporter
 {
@@ -10,4 +9,4 @@ namespace ProfilerDataExporter
         void Free(IList<T> elements);
     }
 }
-#endif
+
